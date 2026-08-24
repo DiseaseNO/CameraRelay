@@ -19,8 +19,10 @@ struct Paring: View {
                     Text("Koble til smarthuset").foregroundStyle(Farge.dempet)
                 }
 
-                felt("Server", tekst: $vert, plassholder: "frcr.gustavs1.no",
-                     hjelp: "Adressen til backend. Ingen «https://» foran.")
+                // Ingen ekte adresse som plassholder: appen skal ikke røpe hvor noens
+                // hjemmeserver står, verken i koden (repoet er offentlig) eller på skjermen.
+                felt("Server", tekst: $vert, plassholder: "vertsnavn.eksempel.no",
+                     hjelp: "Adressen til smarthus-backend. Ingen «https://» foran.")
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
 
