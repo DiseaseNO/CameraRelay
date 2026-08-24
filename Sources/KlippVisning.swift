@@ -25,6 +25,8 @@ struct KameraOpptak: View {
     @State private var ruller = false
     /// Utsetter videobytte til rullingen har falt til ro.
     @State private var byttOppgave: Task<Void, Never>?
+    @State private var fingerNede = false
+    @State private var ventende: Klipp?
     @State private var fullskjerm = false
     @State private var feil: String?
     @State private var laster = true
@@ -100,6 +102,13 @@ struct KameraOpptak: View {
                     .scrollTargetLayout()
                 }
                 .scrollPosition(id: $øverst, anchor: .top)
+                // Vi må vite når fingeren faktisk slipper. iOS 17 har ingen
+                // scroll-fase-hendelse, så vi lytter på gesten ved siden av rullingen.
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in fingerNede = true; byttOppgave?.cancel() }
+                        .onEnded { _ in fingerNede = false; planleggBytte() }
+                )
                 .onChange(of: øverst) { _, ny in
                     guard !ruller, let id = ny, let k = hendelser.first(where: { $0.id == id }) else { return }
                     // Tidslinja følger med én gang …
@@ -107,14 +116,11 @@ struct KameraOpptak: View {
                         vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
                     }
                     hode = k.iv.start
-                    // … men videoen byttes først når rullingen faller til ro. Uten denne
-                    // pausen ville hver rad man ruller forbi startet sin egen avspilling.
-                    byttOppgave?.cancel()
-                    byttOppgave = Task {
-                        try? await Task.sleep(for: .milliseconds(350))
-                        guard !Task.isCancelled, øverst == id else { return }
-                        valgt = k
-                    }
+                    // … men videoen byttes IKKE mens fingeren ligger på skjermen. Den
+                    // markeres blå som «hit er du på vei», og byttes først når du slipper
+                    // og rullingen har falt til ro.
+                    ventende = k
+                    if !fingerNede { planleggBytte() }
                 }
                 .refreshable { await last() }
                 .onChange(of: påVei?.id) { _, ny in
@@ -279,6 +285,17 @@ struct KameraOpptak: View {
         }.flatMap { abs($0.iv.sUnix - u) <= 300 ? $0 : nil }
     }
     private func erPåVei(_ k: Klipp) -> Bool { påVei?.id == k.id && !nåværende(k) }
+
+    /// Bytter til den ventende hendelsen når rullingen har roet seg etter at fingeren slapp.
+    /// Pausen dekker treghetsrullingen — uten den ville videoen byttet midt i utglidningen.
+    private func planleggBytte() {
+        byttOppgave?.cancel()
+        byttOppgave = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled, !fingerNede, let k = ventende else { return }
+            valgt = k
+        }
+    }
 
     /// Bytter kilde i spilleren og flytter spillehodet dit, så tidslinja følger med.
     private func velg(_ k: Klipp) {
