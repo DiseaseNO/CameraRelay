@@ -144,10 +144,22 @@ jobs:
                xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q camerarelay; then break; fi
             sleep 1
           done
-          sleep 8
+          sleep 10
           xcrun simctl io "$UDID" screenshot skjerm-1-live.png
+
+          # Simulatoren kan ikke trykke, så vi starter appen på nytt med argumenter som
+          # tar oss rett dit vi vil se. Argumentene leses bare av DEBUG-bygg.
+          xcrun simctl terminate "$UDID" no.gustavs1.camerarelay || true
+          xcrun simctl launch "$UDID" no.gustavs1.camerarelay \
+            -server "$TEST_SERVER" -token "$TEST_TOKEN" -startfane opptak
           sleep 8
-          xcrun simctl io "$UDID" screenshot skjerm-2-live.png
+          xcrun simctl io "$UDID" screenshot skjerm-2-kameraliste.png
+
+          xcrun simctl terminate "$UDID" no.gustavs1.camerarelay || true
+          xcrun simctl launch "$UDID" no.gustavs1.camerarelay \
+            -server "$TEST_SERVER" -token "$TEST_TOKEN" -startfane opptak -startkamera Gate
+          sleep 10
+          xcrun simctl io "$UDID" screenshot skjerm-3-tidslinje.png
 
           # Appens egen logg. `simctl launch --console-pty` i bakgrunnen ga en tom fil;
           # `log show` etterpå er både enklere og mer komplett.

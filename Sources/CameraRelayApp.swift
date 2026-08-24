@@ -49,14 +49,25 @@ struct CameraRelayApp: App {
 
 struct Hovedvisning: View {
     let api: API
+    @State private var fane = 0
+
+    init(api: API) {
+        self.api = api
+        #if DEBUG
+        // Lar simulator-testene starte rett på en gitt fane: `-startfane opptak`.
+        // Uten dette ser vi bare Live, siden simulatoren ikke kan trykke.
+        if UserDefaults.standard.string(forKey: "startfane") == "opptak" { _fane = State(initialValue: 1) }
+        #endif
+    }
+
     var body: some View {
-        TabView {
+        TabView(selection: $fane) {
             LiveVisning(api: api)
-                .tabItem { Label("Live", systemImage: "video") }
+                .tabItem { Label("Live", systemImage: "video") }.tag(0)
             Kameraliste(api: api)
-                .tabItem { Label("Opptak", systemImage: "clock.arrow.circlepath") }
+                .tabItem { Label("Opptak", systemImage: "clock.arrow.circlepath") }.tag(1)
             Innstillinger(api: api)
-                .tabItem { Label("Innstillinger", systemImage: "gearshape") }
+                .tabItem { Label("Innstillinger", systemImage: "gearshape") }.tag(2)
         }
     }
 }

@@ -188,9 +188,10 @@ struct Kameraliste: View {
     let api: API
     @State private var kameraer: [KameraTL] = []
     @State private var feil: String?
+    @State private var sti: [String] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $sti) {
             ZStack {
                 Farge.flate.ignoresSafeArea()
                 if kameraer.isEmpty {
@@ -201,11 +202,7 @@ struct Kameraliste: View {
                     }
                 } else {
                     List(kameraer, id: \.navn) { kam in
-                        NavigationLink {
-                            KameraOpptak(api: api, kameranavn: kam.navn)
-                        } label: {
-                            rad(kam)
-                        }
+                        NavigationLink(value: kam.navn) { rad(kam) }
                         .listRowBackground(Farge.kort)
                         .listRowSeparatorTint(Farge.strek)
                     }
@@ -216,8 +213,18 @@ struct Kameraliste: View {
             }
             .navigationTitle("Opptak")
             .toolbarBackground(Farge.flate, for: .navigationBar)
+            .navigationDestination(for: String.self) { navn in
+                KameraOpptak(api: api, kameranavn: navn)
+            }
         }
-        .task { await last() }
+        .task {
+            await last()
+            #if DEBUG
+            // Simulator-testene kan gå rett inn i ett kamera: `-startkamera Gate`.
+            if let k = UserDefaults.standard.string(forKey: "startkamera"),
+               kameraer.contains(where: { $0.navn == k }) { sti = [k] }
+            #endif
+        }
     }
 
     /// Nyeste hendelse som forhåndsvisning — da ser du hva kameraet sist fanget uten å
