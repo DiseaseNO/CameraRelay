@@ -14,6 +14,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Apple krever at apper bygges med et SDK som ikke er for gammelt. Runner-bildet
+      # har flere Xcode-versjoner installert; vi tar den nyeste framfor standardvalget,
+      # som ga «This app was built with the iOS 18.5 SDK».
+      - name: Velg nyeste Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          NYESTE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "velger $NYESTE"
+          sudo xcode-select -s "$NYESTE"
+          xcodebuild -version
+
       - name: Installer XcodeGen
         run: brew install xcodegen
 

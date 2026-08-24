@@ -21,16 +21,27 @@ targets:
     type: application
     platform: iOS
     sources: [Sources]
+    # Ekte Info.plist generert av XcodeGen, ikke INFOPLIST_KEY_*-byggeinnstillinger.
+    # Grunnen: UISupportedInterfaceOrientations MÅ være en LISTE. Som byggeinnstilling
+    # ble den skrevet som én kommaseparert streng, og App Store avviste bundlen med
+    # «Invalid bundle. The "UIInterfaceOrientationPortrait,..." key ...».
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Camera
+        UIUserInterfaceStyle: Dark
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Lyd i bakgrunnen — gir også Picture-in-Picture for AVPlayer.
+        UIBackgroundModes:
+          - audio
     settings:
       base:
         # Ett av to steder du må endre ved fork (det andre er DEVELOPMENT_TEAM).
         PRODUCT_BUNDLE_IDENTIFIER: no.gustavs1.camerarelay
-        # MÅ stå for at INFOPLIST_KEY_*-verdiene under skal bli til en faktisk Info.plist.
-        # Uten den feiler signeringen med «target does not have an Info.plist file».
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Camera
-        INFOPLIST_KEY_UILaunchScreen_Generation: true
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
-        # Lyd fortsetter når skjermen låses / appen går i bakgrunnen
-        INFOPLIST_KEY_UIBackgroundModes: audio
+        # Peker på Assets.xcassets/AppIcon.appiconset. Setter samtidig CFBundleIconName,
+        # som App Store krever — uten den avvises opplastingen.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
