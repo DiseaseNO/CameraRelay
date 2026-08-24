@@ -278,7 +278,7 @@ struct KameraOpptak: View {
                 if nåværende(k) {
                     Text("spilles").font(.caption2).foregroundStyle(Farge.aksent)
                 } else if erPåVei(k) {
-                    Text("slipp for å spille").font(.caption2).foregroundStyle(Farge.ok)
+                    Text("slipp for å spille").font(.caption2).foregroundStyle(Farge.kjol)
                 }
             }
             .padding(.horizontal, 2)
@@ -288,7 +288,7 @@ struct KameraOpptak: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(nåværende(k) ? Farge.aksent : (erPåVei(k) ? Farge.ok : .clear),
+                .stroke(nåværende(k) ? Farge.aksent : (erPåVei(k) ? Farge.kjol : .clear),
                         lineWidth: 2)
         )
     }
