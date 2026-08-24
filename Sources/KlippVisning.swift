@@ -1,48 +1,60 @@
 import SwiftUI
 
-/// Opptak: tidslinje øverst, klippene i det synlige vinduet under.
+/// Opptak: kameravelger, dato, tidslinje med spillehode, og hendelseslista under.
 ///
-/// Vinduet ER utvalget — panorerer du bakover, følger lista med. Det er samme grep som på
-/// vegg-dashbordet, og på mobil er det ekstra nyttig: du slipper et eget filtervalg.
+/// Oppbygningen låner fra Tapo der de har løst det bedre enn min første versjon:
+/// tidslinja viser hvor du er (spillehode + tidsboble), datoen velges med piler i stedet
+/// for endeløs panorering, varigheten ligger oppå miniatyren for å spare bredde, og det
+/// som spilles er markert i lista så man ikke mister orienteringen.
+///
+/// Én ting gjør vi tydeligere enn dem: kamera velges eksplisitt. Med to kameraer på samme
+/// tidslinje blir strekene meningsløse — de ville kommet fra to forskjellige steder.
 struct KlippVisning: View {
     let api: API
 
     @State private var kameraer: [KameraTL] = []
+    @State private var valgtKamera: String?
+    @State private var dag: Date = Calendar.current.startOfDay(for: .now)
+    @State private var vindu = Tidslinje.Vindu(midt: .now, spenn: 3 * 3600)
+    @State private var hode: Date = .now
+    @State private var spiller: IntPakke?
     @State private var feil: String?
     @State private var laster = true
-    @State private var vindu = Tidslinje.Vindu(slutt: .now, spenn: 3 * 3600)
-    @State private var valgt: IntPakke?
 
-    /// Alle klipp i vinduet, nyest først — dette er også rekkefølgen spilleren blar i.
-    private var iVinduet: [Klipp] {
-        kameraer.flatMap { kam in
-            kam.deteksjonsklipp
-                .filter { $0.slutt >= vindu.fra && $0.start <= vindu.slutt }
-                .map { Klipp(kamera: kam.navn, iv: $0, alarm: kam.alarm(i: $0)) }
-        }
-        .sorted { $0.iv.sUnix > $1.iv.sUnix }
+    private var kamera: KameraTL? {
+        kameraer.first { $0.navn == valgtKamera } ?? kameraer.first
+    }
+
+    /// Hendelsene på valgt dag, nyest først. Dette er også rekkefølgen spilleren blar i.
+    private var hendelser: [Klipp] {
+        guard let kam = kamera else { return [] }
+        let start = dag, slutt = dag.addingTimeInterval(86400)
+        return kam.deteksjonsklipp
+            .filter { $0.start >= start && $0.start < slutt }
+            .map { Klipp(kamera: kam.navn, iv: $0, alarm: kam.alarm(i: $0)) }
+            .sorted { $0.iv.sUnix > $1.iv.sUnix }
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Farge.flate.ignoresSafeArea()
-                if laster {
+                if laster && kameraer.isEmpty {
                     ProgressView().tint(Farge.dempet)
-                } else if let feil {
-                    VStack(spacing: 8) {
-                        Text(feil).foregroundStyle(Farge.avvik)
-                        Button("Prøv igjen") { Task { await last() } }
-                            .foregroundStyle(Farge.aksent)
-                    }
+                } else if let feil, kameraer.isEmpty {
+                    VStack(spacing: 10) {
+                        Text(feil).foregroundStyle(Farge.avvik).multilineTextAlignment(.center)
+                        Button("Prøv igjen") { Task { await last() } }.foregroundStyle(Farge.aksent)
+                    }.padding()
                 } else {
                     innhold
                 }
             }
             .navigationTitle("Opptak")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Farge.flate, for: .navigationBar)
-            .fullScreenCover(item: $valgt) { pakke in
-                SpillerSkjerm(api: api, klipp: iVinduet, start: pakke.verdi)
+            .fullScreenCover(item: $spiller) { p in
+                SpillerSkjerm(api: api, klipp: hendelser, start: p.verdi)
             }
         }
         .task { await last() }
@@ -50,27 +62,34 @@ struct KlippVisning: View {
 
     private var innhold: some View {
         VStack(spacing: 0) {
-            Tidslinje(kameraer: kameraer, vindu: $vindu) { kamera, iv in
-                // Trykk i tidslinja åpner klippet direkte — ingen omvei via lista.
-                if let i = iVinduet.firstIndex(where: { $0.kamera == kamera && $0.iv.sUnix == iv.sUnix }) {
-                    valgt = IntPakke(verdi: i)
+            kameravelger
+            datolinje
+            Tidslinje(kamera: kamera, vindu: $vindu, hode: $hode) { iv in
+                if let i = hendelser.firstIndex(where: { $0.iv.sUnix == iv.sUnix }) {
+                    spiller = IntPakke(verdi: i)
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.bottom, 10)
+            .padding(.top, 14)
+            .padding(.bottom, 12)
 
-            Divider().overlay(Farge.strek)
-
-            if iVinduet.isEmpty {
+            HStack {
+                Text("Oppdagede hendelser (\(hendelser.count))")
+                    .font(.footnote.weight(.medium)).foregroundStyle(Farge.dempet)
                 Spacer()
-                Text("Ingen klipp i dette tidsrommet.")
-                    .font(.subheadline).foregroundStyle(Farge.svak)
+            }
+            .padding(.horizontal, 16).padding(.bottom, 6)
+
+            if hendelser.isEmpty {
+                Spacer()
+                Text("Ingen hendelser denne dagen.").font(.subheadline).foregroundStyle(Farge.svak)
                 Spacer()
             } else {
-                List(Array(iVinduet.enumerated()), id: \.element.id) { i, k in
-                    Button { valgt = IntPakke(verdi: i) } label: { rad(k) }
-                        .listRowBackground(Farge.kort)
-                        .listRowSeparatorTint(Farge.strek)
+                List(Array(hendelser.enumerated()), id: \.element.id) { i, k in
+                    Button { spiller = IntPakke(verdi: i) } label: { rad(k) }
+                        .listRowBackground(Farge.flate)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 14, bottom: 4, trailing: 14))
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
@@ -79,35 +98,106 @@ struct KlippVisning: View {
         }
     }
 
-    private func rad(_ k: Klipp) -> some View {
-        HStack(spacing: 10) {
-            Circle().fill(Farge.aksent).frame(width: 6, height: 6)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(k.iv.start, format: .dateTime.hour().minute().second())
-                    .font(.subheadline.monospacedDigit()).foregroundStyle(Farge.tekst)
-                Text(k.kamera).font(.caption).foregroundStyle(Farge.dempet)
-            }
-            .frame(width: 78, alignment: .leading)
-
-            Stripe(api: api, klipp: k).frame(height: 38)
-
-            Text(varighet(k.iv))
-                .font(.caption.monospacedDigit()).foregroundStyle(Farge.svak)
-                .frame(width: 42, alignment: .trailing)
+    private var kameravelger: some View {
+        Picker("Kamera", selection: Binding(
+            get: { valgtKamera ?? kameraer.first?.navn ?? "" },
+            set: { valgtKamera = $0 }
+        )) {
+            ForEach(kameraer, id: \.navn) { Text($0.navn).tag($0.navn) }
         }
-        .padding(.vertical, 3)
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 14)
+        .padding(.top, 8)
+    }
+
+    private var datolinje: some View {
+        HStack(spacing: 14) {
+            Button { flyttDag(-1) } label: { Image(systemName: "chevron.left") }
+                .foregroundStyle(Farge.dempet)
+            Text(dag, format: .dateTime.day().month(.wide).year())
+                .font(.subheadline.weight(.medium)).foregroundStyle(Farge.tekst)
+            Button { flyttDag(1) } label: { Image(systemName: "chevron.right") }
+                .foregroundStyle(erIdag ? Farge.strek : Farge.dempet)
+                .disabled(erIdag)
+            Spacer()
+            Button("Nå") { gåTilNå() }
+                .font(.caption).foregroundStyle(Farge.aksent)
+        }
+        .padding(.horizontal, 16).padding(.top, 12)
+    }
+
+    /// Miniatyr med varigheten oppå — sparer en hel kolonne på en smal skjerm.
+    private func rad(_ k: Klipp) -> some View {
+        HStack(spacing: 12) {
+            ZStack(alignment: .bottomTrailing) {
+                Stripe(api: api, klipp: k)
+                    .frame(width: 132, height: 46)
+                Text(varighet(k.iv))
+                    .font(.system(size: 10, weight: .medium).monospacedDigit())
+                    .padding(.horizontal, 4).padding(.vertical, 1)
+                    .background(.black.opacity(0.65))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                    .padding(3)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(k.iv.start, format: .dateTime.hour().minute().second())
+                    .font(.headline.monospacedDigit()).foregroundStyle(Farge.tekst)
+                Image(systemName: "figure.walk")
+                    .font(.caption).foregroundStyle(Farge.aksent)
+            }
+            Spacer()
+        }
+        .padding(6)
+        .background(Farge.kort)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(nåværende(k) ? Farge.aksent : .clear, lineWidth: 2)
+        )
+    }
+
+    /// Hendelsen spillehodet står på markeres — ellers mister man orienteringen når man blar.
+    private func nåværende(_ k: Klipp) -> Bool {
+        let u = hode.timeIntervalSince1970
+        return u >= k.iv.sUnix - 1 && u <= k.iv.eUnix + 1
+    }
+
+    private var erIdag: Bool {
+        Calendar.current.isDate(dag, inSameDayAs: .now)
+    }
+
+    private func flyttDag(_ n: Int) {
+        guard let ny = Calendar.current.date(byAdding: .day, value: n, to: dag) else { return }
+        dag = ny
+        let midt = Calendar.current.isDate(ny, inSameDayAs: .now)
+            ? Date.now
+            : ny.addingTimeInterval(12 * 3600)
+        vindu = .init(midt: midt, spenn: vindu.spenn)
+        hode = midt
+    }
+
+    private func gåTilNå() {
+        dag = Calendar.current.startOfDay(for: .now)
+        vindu = .init(midt: .now, spenn: vindu.spenn)
+        hode = .now
     }
 
     private func varighet(_ iv: Intervall) -> String {
         let d = Int(iv.lengde.rounded())
-        return d < 60 ? "\(d)s" : "\(d / 60)m \(d % 60)s"
+        return String(format: "%d:%02d", d / 60, d % 60)
     }
 
     private func last() async {
         laster = kameraer.isEmpty
         defer { laster = false }
-        do { kameraer = try await api.tidslinje(); feil = nil }
-        catch { feil = error.localizedDescription }
+        do {
+            kameraer = try await api.tidslinje()
+            if valgtKamera == nil { valgtKamera = kameraer.first?.navn }
+            feil = nil
+        } catch {
+            feil = error.localizedDescription
+        }
     }
 }
 
@@ -137,13 +227,11 @@ struct Stripe: View {
         AsyncImage(url: api.stripeURL(kamera: klipp.kamera,
                                       alarmUnix: (klipp.alarm ?? klipp.iv).sUnix)) { faser in
             switch faser {
-            case .success(let bilde):
-                bilde.resizable().scaledToFit()
-            default:
-                RoundedRectangle(cornerRadius: 4).fill(Farge.kort2)
+            case .success(let bilde): bilde.resizable().scaledToFill()
+            default: Rectangle().fill(Farge.kort2)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 

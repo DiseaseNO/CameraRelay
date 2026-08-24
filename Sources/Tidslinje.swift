@@ -1,209 +1,176 @@
 import SwiftUI
 
-/// Tidslinje med ett spor per kamera. Samme prinsipper som vegg-dashbordet, tilpasset
-/// en smal skjerm:
+/// Tidslinje for ETT kamera, med spillehode — inspirert av hvordan Tapo løser det.
 ///
-///  - Bolkene har EKSAKT bredde etter klippets lengde (min. 2 px, ellers forsvinner korte)
-///  - Skinna langs bunnen markerer strekket med kontinuerlig opptak — ubrutt der det finnes,
-///    og helt borte lenger tilbake der bare klippene er igjen
-///  - Motion-alarmen tegnes ikke separat: den ligger alltid inni sitt klipp, og to farger
-///    for samme hendelse ble bare rot
-///  - Knip = zoom, dra = panorer. Det synlige vinduet ER utvalget for lista under.
+/// Forskjellen fra en ren velger er at linja viser HVOR DU ER, ikke bare hva som finnes.
+/// Det gjør den til et navigasjonsverktøy: dra spillehodet, og klippet under følger med.
+///
+///  - Hendelser er tynne streker, ikke blokker. På dagsnivå ER et 40-sekunders klipp en strek,
+///    og å tegne det bredere ville løyet om lengden.
+///  - Skinna langs bunnen markerer strekket med kontinuerlig opptak, og forsvinner der bare
+///    klippene er igjen — ellers gjentar den bare det strekene sier.
+///  - Knip zoomer, dra flytter spillehodet. Tidsboblen viser eksakt tidspunkt underveis.
 struct Tidslinje: View {
-    let kameraer: [KameraTL]
+    let kamera: KameraTL?
     @Binding var vindu: Vindu
-    var påTrykk: (String, Intervall) -> Void
+    /// Tidspunktet spillehodet står på. Settes av dra, og av at et klipp velges.
+    @Binding var hode: Date
+    var påValg: (Intervall) -> Void
 
     struct Vindu: Equatable {
-        var slutt: Date
+        var midt: Date
         var spenn: TimeInterval
-        var fra: Date { slutt.addingTimeInterval(-spenn) }
+        var fra: Date { midt.addingTimeInterval(-spenn / 2) }
+        var til: Date { midt.addingTimeInterval(spenn / 2) }
     }
 
     @State private var spennVedStart: TimeInterval = 0
-    @State private var ankerVedStart: Date = .now
-    @State private var dro = false
+    @State private var drar = false
 
-    private let minSpenn: TimeInterval = 120
-    private let maksSpenn: TimeInterval = 7 * 24 * 3600
+    private let minSpenn: TimeInterval = 300          // 5 min
+    private let maksSpenn: TimeInterval = 24 * 3600   // ett døgn
 
     var body: some View {
-        VStack(spacing: 8) {
-            topplinje
+        VStack(spacing: 4) {
+            akse
             GeometryReader { geo in
-                VStack(spacing: 6) {
-                    ForEach(kameraer, id: \.navn) { kam in
-                        spor(kam, bredde: geo.size.width)
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(.black)
+
+                    // dekning: her finnes det video
+                    ForEach(Array(dekning.enumerated()), id: \.offset) { _, d in
+                        Rectangle().fill(Farge.ok).opacity(0.30)
+                            .frame(width: max(1, bredde(d.1.timeIntervalSince(d.0), geo)))
+                            .offset(x: x(d.0, geo))
                     }
-                    akse(bredde: geo.size.width)
+
+                    // hendelser: tynne streker i eksakt bredde
+                    ForEach(synligeKlipp, id: \.sUnix) { iv in
+                        Rectangle().fill(Farge.aksent)
+                            .frame(width: max(2, bredde(iv.lengde, geo)))
+                            .offset(x: x(iv.start, geo))
+                    }
+
+                    // spillehode
+                    Rectangle().fill(.white).frame(width: 2)
+                        .offset(x: x(hode, geo) - 1)
+                        .shadow(color: .black.opacity(0.6), radius: 2)
                 }
+                .frame(height: 62)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
                 .contentShape(Rectangle())
-                .gesture(gester(bredde: geo.size.width))
+                .gesture(gester(geo))
+                .overlay(alignment: .top) { boble(geo) }
             }
-            .frame(height: CGFloat(kameraer.count) * 40 + 18)
-            tegnforklaring
+            .frame(height: 62)
         }
     }
 
     // MARK: deler
 
-    private var topplinje: some View {
-        HStack(spacing: 6) {
-            Text(vindu.fra, format: .dateTime.day().month(.abbreviated))
-                .font(.caption).foregroundStyle(Farge.dempet)
-            Text("\(kort(vindu.fra))–\(kort(vindu.slutt))")
-                .font(.caption.monospacedDigit()).foregroundStyle(Farge.dempet)
-            Spacer()
-            ForEach([1.0, 3.0, 12.0, 24.0], id: \.self) { t in
-                let valgt = abs(vindu.spenn - t * 3600) < 60
-                Button(t < 24 ? "\(Int(t)) t" : "1 d") {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        vindu = .init(slutt: .now, spenn: t * 3600)
-                    }
-                }
-                .font(.caption2)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(valgt ? Farge.aksent.opacity(0.2) : Farge.kort2)
-                .foregroundStyle(valgt ? Farge.aksent : Farge.dempet)
-                .clipShape(Capsule())
-            }
-        }
-    }
-
-    private func spor(_ kam: KameraTL, bredde: CGFloat) -> some View {
-        let klipp = kam.deteksjonsklipp
-        let dekning = dekningsstrekk(kam)
-        return VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(kam.navn).font(.caption2).foregroundStyle(Farge.dempet)
-                Spacer()
-                Text("\(klipp.filter { synlig($0) }.count)")
-                    .font(.caption2.monospacedDigit()).foregroundStyle(Farge.svak)
-            }
+    private var akse: some View {
+        GeometryReader { geo in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 6).fill(Farge.kort2.opacity(0.6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Farge.strek, lineWidth: 1))
-
-                ForEach(Array(dekning.enumerated()), id: \.offset) { _, d in
-                    Rectangle().fill(Farge.ok).opacity(0.45)
-                        .frame(width: max(1, bredde * andel(d.1 - d.0)), height: 3)
-                        .offset(x: bredde * andel(d.0.timeIntervalSince(vindu.fra)), y: 11)
-                }
-                ForEach(klipp.filter { synlig($0) }, id: \.sUnix) { iv in
-                    RoundedRectangle(cornerRadius: 2).fill(Farge.aksent)
-                        .frame(width: max(2, bredde * andel(iv.lengde)), height: 18)
-                        .offset(x: bredde * andel(iv.start.timeIntervalSince(vindu.fra)), y: -1)
-                        .onTapGesture { if !dro { påTrykk(kam.navn, iv) } }
+                ForEach(merker, id: \.self) { t in
+                    VStack(spacing: 1) {
+                        Rectangle().fill(Farge.strek).frame(width: 1, height: 4)
+                        Text(t, format: .dateTime.hour().minute())
+                            .font(.system(size: 9).monospacedDigit())
+                            .foregroundStyle(Farge.svak)
+                    }
+                    .offset(x: x(t, geo) - 16)
                 }
             }
-            .frame(height: 28)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
         }
+        .frame(height: 18)
     }
 
-    private func akse(bredde: CGFloat) -> some View {
-        let steg = aksesteg()
-        let start = ceil(vindu.fra.timeIntervalSince1970 / steg) * steg
-        let merker = stride(from: start, through: vindu.slutt.timeIntervalSince1970, by: steg)
-            .map { Date(timeIntervalSince1970: $0) }
-        return ZStack(alignment: .leading) {
-            ForEach(merker, id: \.self) { t in
-                Text(kort(t))
-                    .font(.system(size: 9).monospacedDigit()).foregroundStyle(Farge.svak)
-                    .offset(x: bredde * andel(t.timeIntervalSince(vindu.fra)) - 16)
-            }
-        }
-        .frame(height: 12, alignment: .leading)
-    }
-
-    private var tegnforklaring: some View {
-        HStack(spacing: 10) {
-            merke(Farge.aksent, "klipp", høyde: 8)
-            merke(Farge.ok.opacity(0.5), "konstant opptak", høyde: 3)
-            Spacer()
-            Text("knip = zoom").font(.system(size: 9)).foregroundStyle(Farge.svak)
-        }
-    }
-
-    private func merke(_ farge: Color, _ tekst: String, høyde: CGFloat) -> some View {
-        HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 1).fill(farge).frame(width: 8, height: høyde)
-            Text(tekst).font(.system(size: 9)).foregroundStyle(Farge.svak)
-        }
+    /// Tidsboble over spillehodet — den gjør dragingen presis i stedet for omtrentlig.
+    private func boble(_ geo: GeometryProxy) -> some View {
+        Text(hode, format: .dateTime.hour().minute().second())
+            .font(.system(size: 11, weight: .medium).monospacedDigit())
+            .padding(.horizontal, 7).padding(.vertical, 3)
+            .background(drar ? Farge.aksent : Farge.kort2)
+            .foregroundStyle(drar ? Farge.flate : Farge.tekst)
+            .clipShape(Capsule())
+            .offset(x: min(max(x(hode, geo) - 34, 0), max(geo.size.width - 68, 0)), y: -22)
+            .animation(.easeOut(duration: 0.12), value: drar)
     }
 
     // MARK: gester
 
-    private func gester(bredde: CGFloat) -> some Gesture {
+    private func gester(_ geo: GeometryProxy) -> some Gesture {
         SimultaneousGesture(
             MagnifyGesture()
                 .onChanged { g in
-                    if spennVedStart == 0 {
-                        spennVedStart = vindu.spenn
-                        ankerVedStart = vindu.slutt
-                    }
-                    dro = true
-                    let nytt = min(max(spennVedStart / g.magnification, minSpenn), maksSpenn)
-                    vindu = .init(slutt: ankerVedStart, spenn: nytt)
+                    if spennVedStart == 0 { spennVedStart = vindu.spenn }
+                    vindu.spenn = min(max(spennVedStart / g.magnification, minSpenn), maksSpenn)
                 }
-                .onEnded { _ in spennVedStart = 0; etterGest() },
-            DragGesture()
+                .onEnded { _ in spennVedStart = 0 },
+            DragGesture(minimumDistance: 0)
                 .onChanged { g in
-                    if spennVedStart == 0 {
-                        spennVedStart = vindu.spenn
-                        ankerVedStart = vindu.slutt
-                    }
-                    if abs(g.translation.width) > 3 { dro = true }
-                    // Dra mot høyre = bakover i tid.
-                    let forskyv = Double(-g.translation.width / max(bredde, 1)) * spennVedStart
-                    vindu = .init(slutt: min(ankerVedStart.addingTimeInterval(forskyv),
-                                             Date.now.addingTimeInterval(300)),
-                                  spenn: spennVedStart)
+                    drar = true
+                    hode = tid(g.location.x, geo)
                 }
-                .onEnded { _ in spennVedStart = 0; etterGest() }
+                .onEnded { _ in
+                    drar = false
+                    // Slipp = velg klippet spillehodet står på (eller nærmeste innen 5 min).
+                    if let iv = nærmesteKlipp(hode) { påValg(iv) }
+                }
         )
-    }
-
-    /// Klikk skal ikke utløses av en drag. Nullstilles like etter at gesten slipper.
-    private func etterGest() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { dro = false }
     }
 
     // MARK: regning
 
-    private func andel(_ t: TimeInterval) -> CGFloat { CGFloat(t / vindu.spenn) }
-
-    private func synlig(_ iv: Intervall) -> Bool {
-        iv.slutt >= vindu.fra && iv.start <= vindu.slutt
+    private var synligeKlipp: [Intervall] {
+        (kamera?.deteksjonsklipp ?? []).filter { $0.slutt >= vindu.fra && $0.start <= vindu.til }
     }
 
-    /// Sammenhengende strekk med video, men BARE der det finnes kontinuerlig opptak.
-    /// Ellers ville skinna gjentatt det de gule bolkene allerede sier.
-    private func dekningsstrekk(_ kam: KameraTL) -> [(Date, Date)] {
+    private var dekning: [(Date, Date)] {
+        guard let kam = kamera else { return [] }
         let kont = kam.kontinuerlig
-        guard let første = kont.map(\.sUnix).min(), let siste = kont.map(\.eUnix).max() else { return [] }
-        let alle = (kont + kam.deteksjonsklipp).sorted { $0.sUnix < $1.sUnix }
+        guard let a = kont.map(\.sUnix).min(), let b = kont.map(\.eUnix).max() else { return [] }
         var ut: [(Double, Double)] = []
-        for iv in alle {
-            if let sist = ut.last, iv.sUnix <= sist.1 + 2 {
-                ut[ut.count - 1].1 = max(sist.1, iv.eUnix)
-            } else {
-                ut.append((iv.sUnix, iv.eUnix))
-            }
+        for iv in (kont + kam.deteksjonsklipp).sorted(by: { $0.sUnix < $1.sUnix }) {
+            if let sist = ut.last, iv.sUnix <= sist.1 + 2 { ut[ut.count - 1].1 = max(sist.1, iv.eUnix) }
+            else { ut.append((iv.sUnix, iv.eUnix)) }
         }
-        return ut.compactMap { par in
-            let a = max(par.0, første), b = min(par.1, siste)
-            guard b - a >= 2 else { return nil }
-            return (Date(timeIntervalSince1970: a), Date(timeIntervalSince1970: b))
+        return ut.compactMap {
+            let s = max($0.0, a), e = min($0.1, b)
+            guard e - s >= 2 else { return nil }
+            return (Date(timeIntervalSince1970: s), Date(timeIntervalSince1970: e))
         }
     }
 
-    private func aksesteg() -> TimeInterval {
-        let kandidater: [TimeInterval] = [60, 300, 900, 1800, 3600, 7200, 21600, 43200, 86400]
-        return kandidater.first { vindu.spenn / $0 <= 6 } ?? 86400 * 7
+    private func nærmesteKlipp(_ t: Date) -> Intervall? {
+        (kamera?.deteksjonsklipp ?? [])
+            .min { a, b in avstand(a, t) < avstand(b, t) }
+            .flatMap { avstand($0, t) <= 300 ? $0 : nil }
     }
 
-    private func kort(_ d: Date) -> String {
-        d.formatted(.dateTime.hour().minute())
+    private func avstand(_ iv: Intervall, _ t: Date) -> TimeInterval {
+        let u = t.timeIntervalSince1970
+        if u < iv.sUnix { return iv.sUnix - u }
+        if u > iv.eUnix { return u - iv.eUnix }
+        return 0
+    }
+
+    private func x(_ t: Date, _ geo: GeometryProxy) -> CGFloat {
+        CGFloat(t.timeIntervalSince(vindu.fra) / vindu.spenn) * geo.size.width
+    }
+    private func bredde(_ t: TimeInterval, _ geo: GeometryProxy) -> CGFloat {
+        CGFloat(t / vindu.spenn) * geo.size.width
+    }
+    private func tid(_ x: CGFloat, _ geo: GeometryProxy) -> Date {
+        let andel = min(max(Double(x / max(geo.size.width, 1)), 0), 1)
+        return vindu.fra.addingTimeInterval(andel * vindu.spenn)
+    }
+
+    private var merker: [Date] {
+        let steg: TimeInterval = [300, 900, 1800, 3600, 7200, 21600]
+            .first { vindu.spenn / $0 <= 5 } ?? 43200
+        let start = ceil(vindu.fra.timeIntervalSince1970 / steg) * steg
+        return stride(from: start, through: vindu.til.timeIntervalSince1970, by: steg)
+            .map { Date(timeIntervalSince1970: $0) }
     }
 }
