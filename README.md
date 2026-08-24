@@ -26,9 +26,21 @@ merge-konflikter og gjør at CI bygger fra nøyaktig samme kilde som du.
 
 ```bash
 brew install xcodegen
+export DEVELOPMENT_TEAM=DIN_TEAM_ID      # fra Apple Developer → Membership
 xcodegen generate
 open CameraRelay.xcodeproj
 ```
+
+Legg gjerne `export DEVELOPMENT_TEAM=…` i `.envrc` eller `~/.zshrc` så slipper du å tenke på det.
+
+### Bygge med egen Apple-konto
+
+Prosjektet har ingenting personlig hardkodet. Skal du bruke det selv, endrer du to ting:
+
+| Hva | Hvor |
+|---|---|
+| `DEVELOPMENT_TEAM` | miljøvariabel (lokalt) / `APPLE_TEAM_ID`-secret (CI) |
+| `PRODUCT_BUNDLE_IDENTIFIER` | `project.yml` — må matche din egen app i App Store Connect |
 
 ## CI
 
@@ -37,7 +49,7 @@ ved push til `main`. Nødvendige repository secrets:
 
 | Secret | Hva |
 |---|---|
-| `APPLE_TEAM_ID` | Team ID fra Apple Developer |
+| `APPLE_TEAM_ID` | Team ID fra Apple Developer → Membership |
 | `ASC_KEY_ID` | Key ID for App Store Connect API-nøkkelen |
 | `ASC_ISSUER_ID` | Issuer ID |
 | `ASC_KEY_P8_BASE64` | `.p8`-fila, base64-kodet (`base64 -i AuthKey_XXX.p8`) |

@@ -12,10 +12,9 @@ settings:
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.9"
-    # Team ID er ikke en hemmelighet — den ligger i klartekst i enhver signert app.
-    # Hardkodet her så `xcodegen generate` + Xcode virker uten miljøvariabler lokalt;
-    # CI overstyrer med $DEVELOPMENT_TEAM fra secrets.
-    DEVELOPMENT_TEAM: YP38S684GA
+    # Settes fra miljøet ved `xcodegen generate` — ikke hardkodet, så andre kan bygge
+    # prosjektet med sin egen Apple-konto uten å endre fila.
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
     CODE_SIGN_STYLE: Automatic
 targets:
   CameraRelay:
@@ -24,6 +23,7 @@ targets:
     sources: [Sources]
     settings:
       base:
+        # Ett av to steder du må endre ved fork (det andre er DEVELOPMENT_TEAM).
         PRODUCT_BUNDLE_IDENTIFIER: no.gustavs1.camerarelay
         INFOPLIST_KEY_CFBundleDisplayName: Camera
         INFOPLIST_KEY_UILaunchScreen_Generation: true
