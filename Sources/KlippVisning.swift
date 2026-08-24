@@ -95,19 +95,25 @@ struct KameraOpptak: View {
     /// kilden — ingen modal som åpnes og lukkes. Det er den store forskjellen på å bla
     /// gjennom hendelser på en telefon og å åpne dem én for én.
     private var spillerFelt: some View {
-        ZStack {
-            Rectangle().fill(.black)
+        Group {
             if let k = valgt, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
+                // IKKE tving 16:9 på hele feltet: kontrollbaren ligger inni Spiller, og da
+                // måtte bildet krympe for å gi plass — resultatet var svarte kanter på
+                // sidene. Spiller styrer selv bildets sideforhold.
                 Spiller(url: url, markering: k.markering, lengde: k.iv.lengde)
                     .id(k.id)   // ny spiller per klipp — ellers henger forrige igjen
-            } else if hendelser.isEmpty {
-                Text("Ingen opptak å vise").font(.footnote).foregroundStyle(Farge.svak)
             } else {
-                ProgressView().tint(Farge.dempet)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10).fill(.black)
+                    if hendelser.isEmpty {
+                        Text("Ingen opptak å vise").font(.footnote).foregroundStyle(Farge.svak)
+                    } else {
+                        ProgressView().tint(Farge.dempet)
+                    }
+                }
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
             }
         }
-        .aspectRatio(16.0 / 9.0, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.horizontal, 10)
         .padding(.top, 6)
         // Sveip til neste/forrige hendelse uten å se ned i lista. Romslig terskel (70 pt),
