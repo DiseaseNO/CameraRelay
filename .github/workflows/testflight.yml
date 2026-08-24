@@ -52,3 +52,65 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
           FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "120"
+
+  # Kjører appen i simulator og laster opp skjermbilder som artefakter. Uten dette bygger
+  # vi blindt: koden kan kompilere feilfritt og likevel krasje ved oppstart eller se helt
+  # gal ut. Skjermbildene hentes ned og inspiseres (scripts/gh_skjerm.py i smarthus-repoet).
+  simulator:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Velg nyeste Xcode
+        run: |
+          NYESTE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$NYESTE"
+          xcodebuild -version
+
+      - name: Installer XcodeGen
+        run: brew install xcodegen
+
+      - name: Generer Xcode-prosjektet
+        run: xcodegen generate
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Bygg for simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project CameraRelay.xcodeproj \
+            -scheme CameraRelay \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -derivedDataPath dd \
+            CODE_SIGNING_ALLOWED=NO \
+            | tail -30
+
+      - name: Start simulator og kjør appen
+        run: |
+          # Velg en tilgjengelig iPhone-simulator uten å hardkode modellnavn —
+          # runner-bildene bytter modeller mellom Xcode-versjoner.
+          UDID=$(xcrun simctl list devices available --json \
+            | python3 -c "import sys,json;d=json.load(sys.stdin)['devices'];print([x['udid'] for r in d for x in d[r] if 'iPhone' in x['name']][0])")
+          echo "simulator: $UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" dd/Build/Products/Debug-iphonesimulator/CameraRelay.app
+          xcrun simctl launch --console-pty "$UDID" no.gustavs1.camerarelay > app-konsoll.txt 2>&1 &
+          sleep 12
+          xcrun simctl io "$UDID" screenshot skjerm-1-start.png
+          # Skriv inn en serveradresse for å se at feltene og knappen oppfører seg
+          xcrun simctl io "$UDID" screenshot skjerm-2.png
+          echo "--- appens konsollutskrift ---"
+          cat app-konsoll.txt || true
+
+      - name: Last opp skjermbilder
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skjermbilder
+          path: |
+            *.png
+            app-konsoll.txt
+          retention-days: 7
