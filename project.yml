@@ -26,7 +26,10 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: Camera
+        # IKKE «Camera»: Apple avviser visningsnavn som kolliderer med en eksisterende
+        # app (ITMS-90129), og deres eget kamera eier det navnet. Butikknavnet er fritt,
+        # men visningsnavnet må være unikt.
+        CFBundleDisplayName: CameraRelay
         UIUserInterfaceStyle: Dark
         UILaunchScreen: {}
         # ALLE FIRE må med. Appen bygges som universal (iPhone + iPad), og App Store

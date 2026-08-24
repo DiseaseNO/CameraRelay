@@ -42,6 +42,10 @@ Prosjektet har ingenting personlig hardkodet. Skal du bruke det selv, endrer du 
 | `DEVELOPMENT_TEAM` | miljøvariabel (lokalt) / `APPLE_TEAM_ID`-secret (CI) |
 | `PRODUCT_BUNDLE_IDENTIFIER` | `project.yml` — må matche din egen app i App Store Connect |
 
+Merk at `CFBundleDisplayName` (navnet under ikonet) må være **unikt på App Store**. Apple
+avviser opplastingen med ITMS-90129 hvis det kolliderer med en eksisterende app — «Camera»
+går for eksempel ikke.
+
 ## CI
 
 `.github/workflows/testflight.yml` bygger på `macos`-runner og laster til TestFlight
