@@ -108,6 +108,22 @@ struct KameraOpptak: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .padding(.horizontal, 10)
         .padding(.top, 6)
+        // Sveip til neste/forrige hendelse uten å se ned i lista. Romslig terskel (70 pt),
+        // for pinch-zoom i bildet bruker samme flate.
+        .gesture(
+            DragGesture(minimumDistance: 30)
+                .onEnded { g in
+                    guard abs(g.translation.width) > 70 else { return }
+                    blaTil(g.translation.width < 0 ? 1 : -1)
+                }
+        )
+    }
+
+    /// +1 = eldre hendelse (lista er nyest først), -1 = nyere.
+    private func blaTil(_ retning: Int) {
+        guard let n = valgt, let i = hendelser.firstIndex(where: { $0.id == n.id }) else { return }
+        let mål = i + retning
+        if hendelser.indices.contains(mål) { velg(hendelser[mål]) }
     }
 
     private var datolinje: some View {
@@ -319,10 +335,4 @@ struct Stripe: View {
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
-}
-
-/// Liten innpakning så en indeks kan brukes med `.fullScreenCover(item:)`.
-struct IntPakke: Identifiable {
-    let verdi: Int
-    var id: Int { verdi }
 }
