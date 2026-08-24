@@ -10,10 +10,13 @@ import AVFoundation
 /// (UserDefaults plukker opp `-nøkkel verdi`-argumenter av seg selv.)
 private func seedFraOppstartsargumenter() {
     let d = UserDefaults.standard
-    guard let vert = d.string(forKey: "server"), !vert.isEmpty,
-          let token = d.string(forKey: "token"), !token.isEmpty else { return }
+    let vert = d.string(forKey: "server") ?? ""
+    let token = d.string(forKey: "token") ?? ""
+    NSLog("CR-SEED: argumenter=\(ProcessInfo.processInfo.arguments.count) vert=\(vert.isEmpty ? "TOM" : vert) token=\(token.isEmpty ? "TOM" : "\(token.count) tegn")")
+    guard !vert.isEmpty, !token.isEmpty else { return }
     Nøkkelring.skriv(vert, for: "vert")
     Nøkkelring.skriv(token, for: "token")
+    NSLog("CR-SEED: skrevet. Lest tilbake: vert=\(Nøkkelring.les("vert") ?? "nil") token=\(Nøkkelring.les("token") != nil ? "ok" : "nil")")
 }
 #endif
 

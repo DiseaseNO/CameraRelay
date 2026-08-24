@@ -136,8 +136,10 @@ jobs:
           # `log show` etterpå er både enklere og mer komplett.
           xcrun simctl spawn "$UDID" log show --style compact --last 3m \
             --predicate 'processImagePath CONTAINS "CameraRelay"' > app-konsoll.txt 2>&1 || true
+          echo "--- våre egne logglinjer ---"
+          grep -a "CR-SEED\|CR-API" app-konsoll.txt || echo "(ingen CR-linjer funnet)"
           echo "--- siste linjer fra appen ---"
-          tail -40 app-konsoll.txt || true
+          tail -25 app-konsoll.txt || true
 
           # Eventuelle krasjrapporter
           cp ~/Library/Logs/DiagnosticReports/CameraRelay* . 2>/dev/null || true

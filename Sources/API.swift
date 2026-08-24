@@ -63,6 +63,10 @@ final class API {
     private(set) var token: String? = Nøkkelring.les("token")
     var erKlar: Bool { vert != nil && token != nil }
 
+    init() {
+        NSLog("CR-API: vert=\(vert ?? "nil") token=\(token != nil ? "ok" : "nil") erKlar=\(erKlar)")
+    }
+
     // MARK: paring
 
     /// Løser inn en paringskode fra dashbordet. Passordet ditt kommer aldri inn i appen —
