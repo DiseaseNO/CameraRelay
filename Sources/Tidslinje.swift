@@ -26,6 +26,7 @@ struct Tidslinje: View {
 
     @State private var spennVedStart: TimeInterval = 0
     @State private var drar = false
+    @State private var midtVedStart: Date = .now
 
     // Ned til 1 minutt: da er et 40-sekunders klipp to tredjedeler av linja, og lengden
     // er umulig å misforstå. Zoom er det eneste som virkelig løser lengde på tidsakse.
@@ -61,9 +62,11 @@ struct Tidslinje: View {
                             .offset(x: x(iv.start, geo), y: -3)
                     }
 
-                    // spillehode
+                    // Spillehodet står FAST I MIDTEN. Det er tidslinja som beveger seg
+                    // under det — samme prinsipp som en scrubber: du drar innholdet til
+                    // markøren, ikke markøren til innholdet.
                     Rectangle().fill(.white).frame(width: 2)
-                        .offset(x: x(hode, geo) - 1)
+                        .offset(x: geo.size.width / 2 - 1)
                         .shadow(color: .black.opacity(0.6), radius: 2)
                 }
                 .frame(height: 62)
@@ -103,7 +106,7 @@ struct Tidslinje: View {
             .background(drar ? Farge.aksent : Farge.kort2)
             .foregroundStyle(drar ? Farge.flate : Farge.tekst)
             .clipShape(Capsule())
-            .offset(x: min(max(x(hode, geo) - 34, 0), max(geo.size.width - 68, 0)), y: -22)
+            .offset(x: geo.size.width / 2 - 34, y: -22)
             .animation(.easeOut(duration: 0.12), value: drar)
     }
 
@@ -119,21 +122,16 @@ struct Tidslinje: View {
                 .onEnded { _ in spennVedStart = 0 },
             DragGesture(minimumDistance: 0)
                 .onChanged { g in
-                    drar = true
-                    // Drar man UT av kanten, panorerer vinduet i stedet for at spillehodet
-                    // stopper. Nødvendig nå som man ikke kan zoome ut til hele døgnet.
-                    let b = geo.size.width
-                    if g.location.x < 0 || g.location.x > b {
-                        let over = g.location.x < 0 ? g.location.x : g.location.x - b
-                        let skritt = Double(over / max(b, 1)) * vindu.spenn * 0.35
-                        vindu.midt = min(vindu.midt.addingTimeInterval(skritt),
-                                         Date.now.addingTimeInterval(vindu.spenn / 2))
-                    }
-                    hode = tid(g.location.x, geo)
+                    if !drar { drar = true; midtVedStart = vindu.midt }
+                    // Dra mot venstre = framover i tid. Vinduet flyttes, ikke markøren.
+                    let flytt = Double(-g.translation.width / max(geo.size.width, 1)) * vindu.spenn
+                    let ny = midtVedStart.addingTimeInterval(flytt)
+                    vindu.midt = min(ny, Date.now)
+                    hode = vindu.midt
                 }
                 .onEnded { _ in
                     drar = false
-                    // Slipp = velg klippet spillehodet står på (eller nærmeste innen 5 min).
+                    // Slipp = velg klippet markøren står på (eller nærmeste innen 5 min).
                     if let iv = nærmesteKlipp(hode) { påValg(iv) }
                 }
         )

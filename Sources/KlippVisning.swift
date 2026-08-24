@@ -196,7 +196,8 @@ struct KameraOpptak: View {
     private func velg(_ k: Klipp) {
         valgt = k
         hode = k.iv.start
-        if k.iv.start < vindu.fra || k.iv.start > vindu.til {
+        // Markøren står midt på tidslinja, så «gå hit» betyr å sentrere vinduet.
+        withAnimation(.easeOut(duration: 0.25)) {
             vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
         }
     }
