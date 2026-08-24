@@ -25,6 +25,9 @@ targets:
       base:
         # Ett av to steder du må endre ved fork (det andre er DEVELOPMENT_TEAM).
         PRODUCT_BUNDLE_IDENTIFIER: no.gustavs1.camerarelay
+        # MÅ stå for at INFOPLIST_KEY_*-verdiene under skal bli til en faktisk Info.plist.
+        # Uten den feiler signeringen med «target does not have an Info.plist file».
+        GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Camera
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
