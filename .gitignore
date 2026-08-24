@@ -1,0 +1,12 @@
+# Xcode-prosjektet genereres av XcodeGen fra project.yml
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+build/
+.DS_Store
+*.ipa
+*.dSYM.zip
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/
+fastlane/.env*

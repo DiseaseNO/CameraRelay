@@ -1,0 +1,2 @@
+app_identifier "no.gustavs1.camerarelay"
+# apple_id, itc_team_id og team_id settes av App Store Connect API-nøkkelen i CI.
