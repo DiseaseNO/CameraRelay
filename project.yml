@@ -39,10 +39,6 @@ targets:
         # kan ikke installeres før man svarer manuelt på eksportspørsmålet i App Store
         # Connect. Appen bruker bare HTTPS, altså standardkryptering — false er riktig.
         ITSAppUsesNonExemptEncryption: false
-        # Tillater klartekst KUN mot lokalnett/localhost, slik at simulator-testene kan
-        # bruke mock-backend. Trafikk mot internett krever fortsatt HTTPS.
-        NSAppTransportSecurity:
-          NSAllowsLocalNetworking: true
         UIUserInterfaceStyle: Dark
         UILaunchScreen: {}
         # ALLE FIRE må med. Appen bygges som universal (iPhone + iPad), og App Store

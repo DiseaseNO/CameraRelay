@@ -101,22 +101,21 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             | tail -30
 
-      # Hjemme-backend ligger bak en geoblokk, og GitHubs runnere står i USA. Å åpne
-      # for dem ville punktert geoblokken bare for å ta skjermbilder. I stedet kjører vi
-      # en falsk backend her på runneren: deterministiske data, og ingen ekte
-      # kameratilgang i CI. Reell verifisering skjer på telefonen, innenfra Norge.
-      - name: Start mock-backend
+      # Runneren står utenfor hjemmenettet — samme utsiktspunkt som en telefon på
+      # mobilnett. Tester fra innsiden går ut og inn igjen (hairpin) og beviser ingenting.
+      - name: Nås backend utenfra?
+        env:
+          TEST_SERVER: ${{ secrets.TEST_SERVER }}
         run: |
-          python3 Testdata/mock_backend.py &
-          for i in $(seq 1 20); do
-            curl -sf http://127.0.0.1:8099/api/health && break || sleep 1
-          done
-          echo
+          echo "utgående IP: $(curl -s --max-time 10 https://api.ipify.org || echo ukjent)"
+          curl -s -o /dev/null --max-time 20 \
+            -w 'health: oppkobling=%{time_connect}s tls=%{time_appconnect}s status=%{http_code}\n' \
+            "https://$TEST_SERVER/api/health" || echo "NÅDDE IKKE FRAM (geoblokk?)"
 
       - name: Start simulator og kjør appen
         env:
-          TEST_SERVER: "http://127.0.0.1:8099"
-          TEST_TOKEN: "mock-token"
+          TEST_SERVER: ${{ secrets.TEST_SERVER }}
+          TEST_TOKEN: ${{ secrets.TEST_TOKEN }}
         run: |
           # Velg en tilgjengelig iPhone-simulator uten å hardkode modellnavn —
           # runner-bildene bytter modeller mellom Xcode-versjoner.

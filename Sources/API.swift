@@ -132,15 +132,8 @@ final class API {
         c.queryItems = deler
         return c.url
     }
-    /// Normalt https. I DEBUG godtar vi et skjema foran, slik at simulator-testene kan
-    /// peke på en lokal mock-backend — hjemme-backend ligger bak en geoblokk og skal ikke
-    /// åpnes for CI. Release-bygg tvinger alltid https.
-    private func grunnadresse(_ vert: String) -> String {
-        #if DEBUG
-        if vert.hasPrefix("http://") || vert.hasPrefix("https://") { return vert }
-        #endif
-        return "https://" + vert
-    }
+    /// Alltid https. Backend har ekte sertifikat, så det finnes ingen grunn til unntak.
+    private func grunnadresse(_ vert: String) -> String { "https://" + vert }
 
     private func kod(_ s: String) -> String {
         s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
