@@ -142,30 +142,37 @@ struct KameraOpptak: View {
         .padding(.horizontal, 16).padding(.top, 12)
     }
 
-    /// Miniatyr med varigheten oppå — sparer en hel kolonne på en smal skjerm.
+    /// Rad: film-stripa i FULL BREDDE øverst, metadata under.
+    ///
+    /// Stripa er fire rammer ved siden av hverandre, altså ~7:1. I en smal kolonne ble
+    /// bare halvparten synlig, og da mister den verdien sin — poenget er nettopp å se
+    /// forløpet uten å spille av.
     private func rad(_ k: Klipp) -> some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .bottomLeading) {
                 Stripe(api: api, klipp: k)
-                    .frame(width: 150, height: 44)
-                    .clipped()
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(1456.0 / 200.0, contentMode: .fit)
                 Text(varighet(k.iv))
                     .font(.system(size: 10, weight: .medium).monospacedDigit())
-                    .padding(.horizontal, 4).padding(.vertical, 1)
-                    .background(.black.opacity(0.65))
+                    .padding(.horizontal, 5).padding(.vertical, 2)
+                    .background(.black.opacity(0.7))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 3))
-                    .padding(3)
+                    .padding(4)
             }
-            VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
+                Image(systemName: "figure.walk").font(.caption2).foregroundStyle(Farge.aksent)
                 Text(k.iv.start, format: .dateTime.hour().minute().second())
                     .font(.subheadline.monospacedDigit()).foregroundStyle(Farge.tekst)
-                Image(systemName: "figure.walk")
-                    .font(.caption2).foregroundStyle(Farge.aksent)
+                Spacer()
+                if nåværende(k) {
+                    Text("spilles").font(.caption2).foregroundStyle(Farge.aksent)
+                }
             }
-            Spacer(minLength: 0)
+            .padding(.horizontal, 2)
         }
-        .padding(6)
+        .padding(8)
         .background(Farge.kort)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
@@ -332,7 +339,6 @@ struct Stripe: View {
             default: Rectangle().fill(Farge.kort2)
             }
         }
-        .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
