@@ -119,6 +119,14 @@ final class API {
     func liveURL(kamera: String) -> URL? {
         url("/api/kamera/\(kod(kamera))/live.m3u8", [:])
     }
+    /// Fri spoling: recorderen klipper et VILKÅRLIG tidsrom, ikke bare ferdige hendelser.
+    /// Backend tar `?alarm=<unix>` og lager et vindu på −10/+30 s rundt tidspunktet, så vi
+    /// forskyver 10 s fram for å starte omtrent der markøren står.
+    func friOpptakURL(kamera: String, fra: Date) -> URL? {
+        url("/api/kamera/\(kod(kamera))/opptak.m3u8",
+            ["alarm": String(Int(fra.timeIntervalSince1970) + 10), "sub": "2"])
+    }
+
     func opptakURL(kamera: String, klipp: Intervall, sub: Int = 2) -> URL? {
         url("/api/kamera/\(kod(kamera))/opptak.m3u8", ["s": klipp.s, "e": klipp.e, "sub": String(sub)])
     }

@@ -15,6 +15,8 @@ struct Tidslinje: View {
     @Binding var vindu: Vindu
     /// Tidspunktet spillehodet står på. Settes av dra, og av at et klipp velges.
     @Binding var hode: Date
+    /// I fri modus kalles `påValg` uansett hvor man slipper — også utenfor hendelser.
+    var fri: Bool = false
     var påValg: (Intervall) -> Void
 
     struct Vindu: Equatable {
@@ -136,7 +138,15 @@ struct Tidslinje: View {
                 .onEnded { _ in
                     drar = false
                     // Slipp = velg klippet markøren står på (eller nærmeste innen 5 min).
-                    if let iv = nærmesteKlipp(hode) { påValg(iv) }
+                    if fri {
+                        // Fri spoling: spill fra der markøren står, uansett om det finnes
+                        // en hendelse der. Intervallet er bare en bærer av tidspunktet.
+                        påValg(Intervall(s: "", e: "",
+                                         sUnix: hode.timeIntervalSince1970,
+                                         eUnix: hode.timeIntervalSince1970 + 40))
+                    } else if let iv = nærmesteKlipp(hode) {
+                        påValg(iv)
+                    }
                 }
         )
     }

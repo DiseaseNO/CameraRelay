@@ -28,6 +28,11 @@ struct KameraOpptak: View {
     @State private var fingerNede = false
     @State private var ventende: Klipp?
     @State private var fullskjerm = false
+    /// Fri spoling: slipp hvor som helst og spill derfra, i stedet for å hoppe til nærmeste
+    /// hendelse. Et EKSTRA valg — hendelseshopping er fortsatt standard, for det er det man
+    /// vil ni ganger av ti.
+    @State private var fritt = false
+    @State private var friFra: Date?
     @State private var feil: String?
     @State private var laster = true
 
@@ -67,8 +72,9 @@ struct KameraOpptak: View {
         VStack(spacing: 0) {
             spillerFelt
             datolinje
-            Tidslinje(kamera: kamera, vindu: $vindu, hode: $hode) { iv in
-                if let k = hendelser.first(where: { $0.iv.sUnix == iv.sUnix }) { velg(k) }
+            Tidslinje(kamera: kamera, vindu: $vindu, hode: $hode, fri: fritt) { iv in
+                if fritt { friFra = hode; valgt = nil }
+                else if let k = hendelser.first(where: { $0.iv.sUnix == iv.sUnix }) { velg(k) }
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
@@ -141,7 +147,10 @@ struct KameraOpptak: View {
     /// gjennom hendelser på en telefon og å åpne dem én for én.
     private var spillerFelt: some View {
         Group {
-            if let k = valgt, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
+            if fritt, let fra = friFra, let url = api.friOpptakURL(kamera: kameranavn, fra: fra) {
+                Spiller(url: url, markering: nil, lengde: 40)
+                    .id("fri-\(Int(fra.timeIntervalSince1970))")
+            } else if let k = valgt, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
                 // IKKE tving 16:9 på hele feltet: kontrollbaren ligger inni Spiller, og da
                 // måtte bildet krympe for å gi plass — resultatet var svarte kanter på
                 // sidene. Spiller styrer selv bildets sideforhold.
@@ -186,7 +195,10 @@ struct KameraOpptak: View {
             }
         }
         .fullScreenCover(isPresented: $fullskjerm) {
-            if let k = valgt, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
+            if fritt, let fra = friFra, let url = api.friOpptakURL(kamera: kameranavn, fra: fra) {
+                Spiller(url: url, markering: nil, lengde: 40)
+                    .id("fri-\(Int(fra.timeIntervalSince1970))")
+            } else if let k = valgt, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
                 ZStack {
                     Color.black.ignoresSafeArea()
                     Spiller(url: url, markering: k.markering, lengde: k.iv.lengde)
@@ -225,6 +237,14 @@ struct KameraOpptak: View {
                 .foregroundStyle(erIdag ? Farge.strek : Farge.dempet)
                 .disabled(erIdag)
             Spacer()
+            Button { fritt.toggle(); friFra = nil } label: {
+                Label(fritt ? "Fritt" : "Hendelser", systemImage: fritt ? "slider.horizontal.3" : "figure.walk")
+                    .font(.caption2)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(fritt ? Farge.kjol.opacity(0.22) : Farge.kort2)
+                    .foregroundStyle(fritt ? Farge.kjol : Farge.dempet)
+                    .clipShape(Capsule())
+            }
             Button("Nå") { gåTilNå() }
                 .font(.caption).foregroundStyle(Farge.aksent)
         }
