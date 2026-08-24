@@ -35,6 +35,10 @@ targets:
         # hver opplasting het «Build 1», som Apple avviser som duplikat.
         CFBundleVersion: ${BUILD_NUMBER}
         CFBundleShortVersionString: "1.0"
+        # Uten denne blir hvert bygg liggende som «Missing Compliance» i TestFlight og
+        # kan ikke installeres før man svarer manuelt på eksportspørsmålet i App Store
+        # Connect. Appen bruker bare HTTPS, altså standardkryptering — false er riktig.
+        ITSAppUsesNonExemptEncryption: false
         UIUserInterfaceStyle: Dark
         UILaunchScreen: {}
         # ALLE FIRE må med. Appen bygges som universal (iPhone + iPad), og App Store
