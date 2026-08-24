@@ -64,7 +64,9 @@ final class API {
     var erKlar: Bool { vert != nil && token != nil }
 
     init() {
+        #if DEBUG
         NSLog("CR-API: vert=\(vert ?? "nil") token=\(token != nil ? "ok" : "nil") erKlar=\(erKlar)")
+        #endif
     }
 
     // MARK: paring

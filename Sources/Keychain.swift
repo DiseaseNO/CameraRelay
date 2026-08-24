@@ -16,8 +16,24 @@ enum Nøkkelring {
             kSecValueData as String: Data(verdi.utf8),
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
-        SecItemAdd(spørring as CFDictionary, nil)
+        let status = SecItemAdd(spørring as CFDictionary, nil)
+        #if DEBUG
+        // Simulator-bygget i CI er USIGNERT (CODE_SIGNING_ALLOWED=NO) og har derfor ingen
+        // keychain-entitlement. SecItemAdd feiler da med -34018, og verdien forsvant i
+        // stillhet. For at skjermbilde-testene skal komme forbi paringen faller vi tilbake
+        // på UserDefaults. Release-bygg — det du installerer — har ikke denne koden.
+        if status != errSecSuccess {
+            NSLog("CR-KEYCHAIN: SecItemAdd feilet (\(status)) — bruker UserDefaults i DEBUG")
+            UserDefaults.standard.set(verdi, forKey: reservenøkkel(konto))
+        }
+        #else
+        _ = status
+        #endif
     }
+
+    #if DEBUG
+    private static func reservenøkkel(_ konto: String) -> String { "nk_" + konto }
+    #endif
 
     static func les(_ konto: String) -> String? {
         let spørring: [String: Any] = [
@@ -28,12 +44,21 @@ enum Nøkkelring {
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         var ut: CFTypeRef?
-        guard SecItemCopyMatching(spørring as CFDictionary, &ut) == errSecSuccess,
-              let data = ut as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        if SecItemCopyMatching(spørring as CFDictionary, &ut) == errSecSuccess,
+           let data = ut as? Data {
+            return String(data: data, encoding: .utf8)
+        }
+        #if DEBUG
+        return UserDefaults.standard.string(forKey: reservenøkkel(konto))
+        #else
+        return nil
+        #endif
     }
 
     static func slett(_ konto: String) {
+        #if DEBUG
+        UserDefaults.standard.removeObject(forKey: reservenøkkel(konto))
+        #endif
         SecItemDelete([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: tjeneste,
