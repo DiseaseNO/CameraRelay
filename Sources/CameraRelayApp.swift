@@ -53,7 +53,7 @@ struct Hovedvisning: View {
         TabView {
             LiveVisning(api: api)
                 .tabItem { Label("Live", systemImage: "video") }
-            KlippVisning(api: api)
+            Kameraliste(api: api)
                 .tabItem { Label("Opptak", systemImage: "clock.arrow.circlepath") }
             Innstillinger(api: api)
                 .tabItem { Label("Innstillinger", systemImage: "gearshape") }

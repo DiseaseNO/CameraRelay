@@ -1,19 +1,19 @@
 import SwiftUI
 
-/// Opptak: kameravelger, dato, tidslinje med spillehode, og hendelseslista under.
+/// Opptak for ETT kamera: dato, tidslinje med spillehode, og hendelseslista under.
 ///
-/// Oppbygningen låner fra Tapo der de har løst det bedre enn min første versjon:
-/// tidslinja viser hvor du er (spillehode + tidsboble), datoen velges med piler i stedet
-/// for endeløs panorering, varigheten ligger oppå miniatyren for å spare bredde, og det
-/// som spilles er markert i lista så man ikke mister orienteringen.
+/// Kameraet velges FØR man kommer hit (se `Kameraliste`) — samme flyt som Tapo. Da slipper
+/// vi en velger som stjeler høyde, og tidslinja får all plassen den trenger.
 ///
-/// Én ting gjør vi tydeligere enn dem: kamera velges eksplisitt. Med to kameraer på samme
-/// tidslinje blir strekene meningsløse — de ville kommet fra to forskjellige steder.
-struct KlippVisning: View {
+/// Resten låner fra Tapo der de løste det bedre enn mitt første forsøk: tidslinja viser hvor
+/// du er (spillehode + tidsboble), datoen velges med piler i stedet for endeløs panorering,
+/// varigheten ligger oppå miniatyren for å spare bredde, og hendelsen som spilles er markert
+/// så man ikke mister orienteringen.
+struct KameraOpptak: View {
     let api: API
+    let kameranavn: String
 
     @State private var kameraer: [KameraTL] = []
-    @State private var valgtKamera: String?
     @State private var dag: Date = Calendar.current.startOfDay(for: .now)
     @State private var vindu = Tidslinje.Vindu(midt: .now, spenn: 3 * 3600)
     @State private var hode: Date = .now
@@ -21,9 +21,7 @@ struct KlippVisning: View {
     @State private var feil: String?
     @State private var laster = true
 
-    private var kamera: KameraTL? {
-        kameraer.first { $0.navn == valgtKamera } ?? kameraer.first
-    }
+    private var kamera: KameraTL? { kameraer.first { $0.navn == kameranavn } }
 
     /// Hendelsene på valgt dag, nyest først. Dette er også rekkefølgen spilleren blar i.
     private var hendelser: [Klipp] {
@@ -36,33 +34,30 @@ struct KlippVisning: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Farge.flate.ignoresSafeArea()
-                if laster && kameraer.isEmpty {
-                    ProgressView().tint(Farge.dempet)
-                } else if let feil, kameraer.isEmpty {
-                    VStack(spacing: 10) {
-                        Text(feil).foregroundStyle(Farge.avvik).multilineTextAlignment(.center)
-                        Button("Prøv igjen") { Task { await last() } }.foregroundStyle(Farge.aksent)
-                    }.padding()
-                } else {
-                    innhold
-                }
+        ZStack {
+            Farge.flate.ignoresSafeArea()
+            if laster && kameraer.isEmpty {
+                ProgressView().tint(Farge.dempet)
+            } else if let feil, kameraer.isEmpty {
+                VStack(spacing: 10) {
+                    Text(feil).foregroundStyle(Farge.avvik).multilineTextAlignment(.center)
+                    Button("Prøv igjen") { Task { await last() } }.foregroundStyle(Farge.aksent)
+                }.padding()
+            } else {
+                innhold
             }
-            .navigationTitle("Opptak")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Farge.flate, for: .navigationBar)
-            .fullScreenCover(item: $spiller) { p in
-                SpillerSkjerm(api: api, klipp: hendelser, start: p.verdi)
-            }
+        }
+        .navigationTitle(kameranavn)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Farge.flate, for: .navigationBar)
+        .fullScreenCover(item: $spiller) { p in
+            SpillerSkjerm(api: api, klipp: hendelser, start: p.verdi)
         }
         .task { await last() }
     }
 
     private var innhold: some View {
         VStack(spacing: 0) {
-            kameravelger
             datolinje
             Tidslinje(kamera: kamera, vindu: $vindu, hode: $hode) { iv in
                 if let i = hendelser.firstIndex(where: { $0.iv.sUnix == iv.sUnix }) {
@@ -96,18 +91,6 @@ struct KlippVisning: View {
                 .refreshable { await last() }
             }
         }
-    }
-
-    private var kameravelger: some View {
-        Picker("Kamera", selection: Binding(
-            get: { valgtKamera ?? kameraer.first?.navn ?? "" },
-            set: { valgtKamera = $0 }
-        )) {
-            ForEach(kameraer, id: \.navn) { Text($0.navn).tag($0.navn) }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal, 14)
-        .padding(.top, 8)
     }
 
     private var datolinje: some View {
@@ -193,11 +176,78 @@ struct KlippVisning: View {
         defer { laster = false }
         do {
             kameraer = try await api.tidslinje()
-            if valgtKamera == nil { valgtKamera = kameraer.first?.navn }
             feil = nil
         } catch {
             feil = error.localizedDescription
         }
+    }
+}
+
+/// Opptak-fanens rot: velg kamera, og gå inn i det kameraets opptak.
+struct Kameraliste: View {
+    let api: API
+    @State private var kameraer: [KameraTL] = []
+    @State private var feil: String?
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Farge.flate.ignoresSafeArea()
+                if kameraer.isEmpty {
+                    if let feil {
+                        Text(feil).foregroundStyle(Farge.avvik).padding()
+                    } else {
+                        ProgressView().tint(Farge.dempet)
+                    }
+                } else {
+                    List(kameraer, id: \.navn) { kam in
+                        NavigationLink {
+                            KameraOpptak(api: api, kameranavn: kam.navn)
+                        } label: {
+                            rad(kam)
+                        }
+                        .listRowBackground(Farge.kort)
+                        .listRowSeparatorTint(Farge.strek)
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .refreshable { await last() }
+                }
+            }
+            .navigationTitle("Opptak")
+            .toolbarBackground(Farge.flate, for: .navigationBar)
+        }
+        .task { await last() }
+    }
+
+    /// Nyeste hendelse som forhåndsvisning — da ser du hva kameraet sist fanget uten å
+    /// gå inn, og du kjenner igjen kameraet på bildet framfor navnet.
+    private func rad(_ kam: KameraTL) -> some View {
+        let siste = kam.deteksjonsklipp.last
+        return HStack(spacing: 12) {
+            if let iv = siste {
+                Stripe(api: api, klipp: Klipp(kamera: kam.navn, iv: iv, alarm: kam.alarm(i: iv)))
+                    .frame(width: 108, height: 40)
+            } else {
+                RoundedRectangle(cornerRadius: 6).fill(Farge.kort2).frame(width: 108, height: 40)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(kam.navn).font(.headline).foregroundStyle(Farge.tekst)
+                if let iv = siste {
+                    Text("siste: \(iv.start.formatted(.dateTime.hour().minute()))  ·  \(kam.deteksjonsklipp.count) klipp")
+                        .font(.caption).foregroundStyle(Farge.dempet)
+                } else {
+                    Text("ingen klipp").font(.caption).foregroundStyle(Farge.svak)
+                }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func last() async {
+        do { kameraer = try await api.tidslinje(); feil = nil }
+        catch { feil = error.localizedDescription }
     }
 }
 
