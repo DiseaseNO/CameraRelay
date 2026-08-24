@@ -25,6 +25,7 @@ struct KameraOpptak: View {
     @State private var ruller = false
     /// Utsetter videobytte til rullingen har falt til ro.
     @State private var byttOppgave: Task<Void, Never>?
+    @State private var fullskjerm = false
     @State private var feil: String?
     @State private var laster = true
 
@@ -156,13 +157,49 @@ struct KameraOpptak: View {
         .padding(.top, 6)
         // Sveip til neste/forrige hendelse uten å se ned i lista. Romslig terskel (70 pt),
         // for pinch-zoom i bildet bruker samme flate.
-        .gesture(
+        // simultaneousGesture, ikke gesture: som eksklusiv gest slukte den pinch-zoomen
+        // inni Spiller, og zoom sluttet å virke på opptak.
+        .simultaneousGesture(
             DragGesture(minimumDistance: 30)
                 .onEnded { g in
                     guard abs(g.translation.width) > 70 else { return }
                     blaTil(g.translation.width < 0 ? 1 : -1)
                 }
         )
+        .overlay(alignment: .topTrailing) {
+            if valgt != nil {
+                Button { fullskjerm = true } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.footnote)
+                        .frame(width: 34, height: 34)
+                        .background(.black.opacity(0.55))
+                        .foregroundStyle(.white)
+                        .clipShape(Circle())
+                }
+                .padding(18)
+            }
+        }
+        .fullScreenCover(isPresented: $fullskjerm) {
+            if let k = valgt, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    Spiller(url: url, markering: k.markering, lengde: k.iv.lengde)
+                    VStack {
+                        HStack {
+                            Button { fullskjerm = false } label: {
+                                Image(systemName: "xmark")
+                                    .frame(width: 40, height: 40)
+                                    .background(.black.opacity(0.55))
+                                    .foregroundStyle(.white).clipShape(Circle())
+                            }
+                            Spacer()
+                        }
+                        .padding()
+                        Spacer()
+                    }
+                }
+            }
+        }
     }
 
     /// +1 = eldre hendelse (lista er nyest først), -1 = nyere.
