@@ -13,6 +13,8 @@ enum Farge {
     static let aksent = Color(hex: 0xF5A524)  // varm gul: interaktivt og aktivt
     static let ok     = Color(hex: 0x4ADE80)
     static let avvik  = Color(hex: 0xF87171)
+    /// Kjølig blå: «hit er du på vei», i motsetning til aksentgul som betyr «dette spilles».
+    static let kjol   = Color(hex: 0x58A6D8)
 }
 
 extension Color {

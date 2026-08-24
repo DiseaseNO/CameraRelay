@@ -84,7 +84,8 @@ struct KameraOpptak: View {
                 // ScrollView framfor List: da kan vi følge hvilken hendelse som er øverst,
                 // og la tidslinja gli med når man ruller. Uten det mister man
                 // sammenhengen mellom lista og tiden.
-                ScrollView {
+                ScrollViewReader { rull in
+                  ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(hendelser) { k in
                             Button { velg(k) } label: { rad(k) }
@@ -104,6 +105,15 @@ struct KameraOpptak: View {
                     hode = k.iv.start
                 }
                 .refreshable { await last() }
+                .onChange(of: påVei?.id) { _, ny in
+                    // Rull til klippet markøren står over, ellers ser man ikke hvor man
+                    // er på vei — den blå rammen kan like gjerne være utenfor skjermen.
+                    guard let ny else { return }
+                    ruller = true
+                    withAnimation(.easeOut(duration: 0.2)) { rull.scrollTo(ny, anchor: .top) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { ruller = false }
+                }
+                }
             }
         }
     }
@@ -193,6 +203,8 @@ struct KameraOpptak: View {
                 Spacer()
                 if nåværende(k) {
                     Text("spilles").font(.caption2).foregroundStyle(Farge.aksent)
+                } else if erPåVei(k) {
+                    Text("slipp for å spille").font(.caption2).foregroundStyle(Farge.kjol)
                 }
             }
             .padding(.horizontal, 2)
@@ -202,12 +214,23 @@ struct KameraOpptak: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(nåværende(k) ? Farge.aksent : .clear, lineWidth: 2)
+                .stroke(nåværende(k) ? Farge.aksent : (erPåVei(k) ? Farge.kjol : .clear),
+                        lineWidth: 2)
         )
     }
 
     /// Hendelsen som spilles markeres — ellers mister man orienteringen når man blar.
     private func nåværende(_ k: Klipp) -> Bool { valgt?.id == k.id }
+
+    /// Klippet markøren står over akkurat nå — altså der du lander hvis du slipper.
+    /// Uten dette må man slippe for å finne ut hvor man havnet.
+    private var påVei: Klipp? {
+        let u = hode.timeIntervalSince1970
+        return hendelser.min {
+            abs($0.iv.sUnix - u) < abs($1.iv.sUnix - u)
+        }.flatMap { abs($0.iv.sUnix - u) <= 300 ? $0 : nil }
+    }
+    private func erPåVei(_ k: Klipp) -> Bool { påVei?.id == k.id && !nåværende(k) }
 
     /// Bytter kilde i spilleren og flytter spillehodet dit, så tidslinja følger med.
     private func velg(_ k: Klipp) {
