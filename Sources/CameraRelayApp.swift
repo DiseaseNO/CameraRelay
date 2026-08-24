@@ -43,6 +43,9 @@ struct CameraRelayApp: App {
             }
             .preferredColorScheme(.dark)
             .tint(Farge.aksent)
+            // Appen er på norsk; da skal klokkeslett og datoer være det også.
+            // Uten dette arver den enhetens locale og viser «7:36:23 PM».
+            .environment(\.locale, Locale(identifier: "nb_NO"))
         }
     }
 }

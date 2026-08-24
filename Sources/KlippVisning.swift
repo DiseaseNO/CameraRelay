@@ -112,9 +112,10 @@ struct KameraOpptak: View {
     /// Miniatyr med varigheten oppå — sparer en hel kolonne på en smal skjerm.
     private func rad(_ k: Klipp) -> some View {
         HStack(spacing: 12) {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .bottomLeading) {
                 Stripe(api: api, klipp: k)
-                    .frame(width: 132, height: 46)
+                    .frame(width: 150, height: 44)
+                    .clipped()
                 Text(varighet(k.iv))
                     .font(.system(size: 10, weight: .medium).monospacedDigit())
                     .padding(.horizontal, 4).padding(.vertical, 1)
@@ -123,13 +124,13 @@ struct KameraOpptak: View {
                     .clipShape(RoundedRectangle(cornerRadius: 3))
                     .padding(3)
             }
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(k.iv.start, format: .dateTime.hour().minute().second())
-                    .font(.headline.monospacedDigit()).foregroundStyle(Farge.tekst)
+                    .font(.subheadline.monospacedDigit()).foregroundStyle(Farge.tekst)
                 Image(systemName: "figure.walk")
-                    .font(.caption).foregroundStyle(Farge.aksent)
+                    .font(.caption2).foregroundStyle(Farge.aksent)
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(6)
         .background(Farge.kort)
@@ -284,10 +285,13 @@ struct Stripe: View {
         AsyncImage(url: api.stripeURL(kamera: klipp.kamera,
                                       alarmUnix: (klipp.alarm ?? klipp.iv).sUnix)) { faser in
             switch faser {
-            case .success(let bilde): bilde.resizable().scaledToFill()
+            // scaledToFit, ikke Fill: stripa er ~7:1 og ville flommet ut av raden og
+            // lagt seg bak teksten. Den skal vises HEL — det er hele poenget med den.
+            case .success(let bilde): bilde.resizable().scaledToFit()
             default: Rectangle().fill(Farge.kort2)
             }
         }
+        .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }

@@ -35,20 +35,21 @@ struct Tidslinje: View {
             akse
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Rectangle().fill(.black)
+                    Rectangle().fill(Farge.kort2)
 
-                    // dekning: her finnes det video
+                    // Dekning som TYNN SKINNE langs bunnen. Som fylt flate overdøvet den
+                    // hendelsene fullstendig — og de er det man er ute etter.
                     ForEach(Array(dekning.enumerated()), id: \.offset) { _, d in
-                        Rectangle().fill(Farge.ok).opacity(0.30)
-                            .frame(width: max(1, bredde(d.1.timeIntervalSince(d.0), geo)))
-                            .offset(x: x(d.0, geo))
+                        Rectangle().fill(Farge.ok).opacity(0.55)
+                            .frame(width: max(1, bredde(d.1.timeIntervalSince(d.0), geo)), height: 4)
+                            .offset(x: x(d.0, geo), y: 29)
                     }
 
                     // hendelser: tynne streker i eksakt bredde
                     ForEach(synligeKlipp, id: \.sUnix) { iv in
                         Rectangle().fill(Farge.aksent)
-                            .frame(width: max(2, bredde(iv.lengde, geo)))
-                            .offset(x: x(iv.start, geo))
+                            .frame(width: max(2, bredde(iv.lengde, geo)), height: 52)
+                            .offset(x: x(iv.start, geo), y: -3)
                     }
 
                     // spillehode
