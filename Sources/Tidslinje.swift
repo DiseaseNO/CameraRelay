@@ -62,6 +62,10 @@ struct Tidslinje: View {
                             .offset(x: x(iv.start, geo), y: -3)
                     }
 
+                    // Tidsboblen ligger INNI sporet. Som overlegg over det ble den klippet
+                    // bort av foreldrevisningen og var usynlig.
+                    boble(geo)
+
                     // Spillehodet står FAST I MIDTEN. Det er tidslinja som beveger seg
                     // under det — samme prinsipp som en scrubber: du drar innholdet til
                     // markøren, ikke markøren til innholdet.
@@ -73,7 +77,6 @@ struct Tidslinje: View {
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .contentShape(Rectangle())
                 .gesture(gester(geo))
-                .overlay(alignment: .top) { boble(geo) }
             }
             .frame(height: 62)
         }
@@ -106,8 +109,9 @@ struct Tidslinje: View {
             .background(drar ? Farge.aksent : Farge.kort2)
             .foregroundStyle(drar ? Farge.flate : Farge.tekst)
             .clipShape(Capsule())
-            .offset(x: geo.size.width / 2 - 34, y: -22)
+            .offset(x: geo.size.width / 2 - 34, y: 4)
             .animation(.easeOut(duration: 0.12), value: drar)
+            .zIndex(1)
     }
 
     // MARK: gester
