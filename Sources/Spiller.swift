@@ -13,6 +13,7 @@ struct Spiller: View {
     @State private var tid: Double = 0
     @State private var varighet: Double = 0
     @State private var går = true
+    @State private var dempet = true
     @State private var zoom: CGFloat = 1
     @State private var skyv: CGSize = .zero
     @State private var zoomVedStart: CGFloat = 1
@@ -125,6 +126,7 @@ struct Spiller: View {
 
     private func start() {
         spiller.replaceCurrentItem(with: AVPlayerItem(url: url))
+        spiller.isMuted = dempet
         spiller.play()
         observatør = spiller.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main
