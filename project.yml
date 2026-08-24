@@ -29,7 +29,12 @@ targets:
         # IKKE «Camera»: Apple avviser visningsnavn som kolliderer med en eksisterende
         # app (ITMS-90129), og deres eget kamera eier det navnet. Butikknavnet er fritt,
         # men visningsnavnet må være unikt.
-        CFBundleDisplayName: CameraRelay
+        CFBundleDisplayName: ${DISPLAY_NAME}
+        # Byggnummeret MÅ stå her. increment_build_number skriver bare til prosjektfila,
+        # og siden vi genererer Info.plist selv ble CFBundleVersion aldri satt —
+        # hver opplasting het «Build 1», som Apple avviser som duplikat.
+        CFBundleVersion: ${BUILD_NUMBER}
+        CFBundleShortVersionString: "1.0"
         UIUserInterfaceStyle: Dark
         UILaunchScreen: {}
         # ALLE FIRE må med. Appen bygges som universal (iPhone + iPad), og App Store

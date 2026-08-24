@@ -32,6 +32,10 @@ jobs:
         run: xcodegen generate
         env:
           DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          # Navnet under ikonet. Må være unikt på App Store (ITMS-90129), derfor
+          # en secret framfor hardkodet verdi — da kan det byttes uten kodeendring.
+          DISPLAY_NAME: ${{ secrets.DISPLAY_NAME || 'CameraRelay' }}
 
       # xcodebuild leter etter nøkkelen i ~/.appstoreconnect/private_keys, med filnavn
       # AuthKey_<KEYID>.p8. Uten den kan ikke -allowProvisioningUpdates snakke med Apple.
@@ -74,6 +78,10 @@ jobs:
         run: xcodegen generate
         env:
           DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          # Navnet under ikonet. Må være unikt på App Store (ITMS-90129), derfor
+          # en secret framfor hardkodet verdi — da kan det byttes uten kodeendring.
+          DISPLAY_NAME: ${{ secrets.DISPLAY_NAME || 'CameraRelay' }}
 
       - name: Bygg for simulator
         run: |

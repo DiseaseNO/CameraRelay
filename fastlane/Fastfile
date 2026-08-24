@@ -29,20 +29,8 @@ platform :ios do
       in_house: false
     )
 
-    # Byggnummer = løpenummeret til CI-kjøringen, så hver opplasting er unik.
-    # skip_info_plist: prosjektet har ingen Info.plist-FIL (den genereres av
-    # GENERATE_INFOPLIST_FILE), så forsøket på å redigere den leter etter «.../YES».
-    increment_build_number(
-      xcodeproj: "CameraRelay.xcodeproj",
-      build_number: ENV.fetch("GITHUB_RUN_NUMBER", Time.now.to_i.to_s),
-      skip_info_plist: true
-    )
-
-    # Nøkkelen må gis til xcodebuild eksplisitt — den arver ikke fastlanes api_key.
-    signering = "-allowProvisioningUpdates " \
-                "-authenticationKeyPath #{key_path} " \
-                "-authenticationKeyID #{key_id} " \
-                "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}"
+    # (Byggnummeret settes av XcodeGen fra $BUILD_NUMBER — se project.yml.
+    # increment_build_number virker ikke når Info.plist genereres.)
 
     build_app(
       scheme: "CameraRelay",
