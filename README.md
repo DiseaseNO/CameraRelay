@@ -42,6 +42,13 @@ ved push til `main`. Nødvendige repository secrets:
 | `ASC_ISSUER_ID` | Issuer ID |
 | `ASC_KEY_P8_BASE64` | `.p8`-fila, base64-kodet (`base64 -i AuthKey_XXX.p8`) |
 
+## Capabilities
+
+**Ingen.** Appen trenger verken push, app groups, keychain sharing eller associated domains.
+Bakgrunnslyd (som også gir Picture-in-Picture) settes i Info.plist via `project.yml`, ikke som
+entitlement. Vanlig HTTPS krever ingen capability — og siden serveren har et ekte
+Let's Encrypt-sertifikat trengs heller ingen App Transport Security-unntak.
+
 ## Teknisk
 
 AVPlayer kan ikke MediaSource Extensions, som web-dashbordet bruker. Backend pakker
