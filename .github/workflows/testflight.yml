@@ -22,6 +22,17 @@ jobs:
         env:
           DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
 
+      # xcodebuild leter etter nøkkelen i ~/.appstoreconnect/private_keys, med filnavn
+      # AuthKey_<KEYID>.p8. Uten den kan ikke -allowProvisioningUpdates snakke med Apple.
+      - name: Legg App Store Connect-nøkkelen der Xcode finner den
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_KEY_P8_BASE64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          chmod 600 ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+
       - name: Bygg og last opp til TestFlight
         run: bundle exec fastlane beta || fastlane beta
         env:
@@ -29,7 +40,4 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
-          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
-          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "120"

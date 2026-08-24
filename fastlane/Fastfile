@@ -1,9 +1,10 @@
 # Bygger og laster opp til TestFlight.
 #
-# Signering går via `match`: sertifikat og provisioning-profil lagres KRYPTERT i et privat
-# repo og gjenbrukes ved hver kjøring. Alternativet — å la fastlane lage dem på sparket —
-# virker, men bruker opp et nytt distribusjonssertifikat per bygg, og Apple gir deg bare
-# 2-3 av dem. Da står man fast etter noen runder.
+# Signering: automatisk, med App Store Connect API-nøkkelen alene. Siden Xcode 13 kan
+# `-allowProvisioningUpdates` opprette og hente provisioning-profiler OG bruke Apples
+# *cloud-managed* distribusjonssertifikat — den private nøkkelen blir hos Apple. Derfor
+# trengs verken match, sertifikat-repo eller passfrase, og vi bruker ikke opp de 2-3
+# manuelle distribusjonssertifikatene kontoen har.
 #
 # Ingen hemmeligheter i denne fila: alt kommer fra GitHub-secrets via miljøet.
 default_platform(:ios)
@@ -13,26 +14,19 @@ APP_ID = "no.gustavs1.camerarelay"
 platform :ios do
   desc "Bygg og last opp til TestFlight"
   lane :beta do
-    # Midlertidig keychain på CI. Uten denne har ikke runneren noe sted å legge
-    # sertifikatet, og signeringen feiler på et lite opplysende vis.
+    # Midlertidig keychain på CI. Uten den har ikke runneren noe sted å legge
+    # signeringsmateriellet, og feilen som kommer er lite opplysende.
     setup_ci if ENV["CI"]
 
-    api_key = app_store_connect_api_key(
-      key_id: ENV.fetch("ASC_KEY_ID"),
-      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
-      key_content: ENV.fetch("ASC_KEY_P8_BASE64"),
-      is_key_content_base64: true,
-      in_house: false
-    )
+    # Workflowen har lagt .p8-fila her — xcodebuild leter i ~/.appstoreconnect/private_keys.
+    key_id = ENV.fetch("ASC_KEY_ID")
+    key_path = File.expand_path("~/.appstoreconnect/private_keys/AuthKey_#{key_id}.p8")
 
-    # Henter (eller oppretter første gang) sertifikat + profil fra match-repoet.
-    match(
-      type: "appstore",
-      app_identifier: APP_ID,
-      api_key: api_key,
-      readonly: false,          # første kjøring MÅ få lov til å opprette
-      git_url: ENV.fetch("MATCH_GIT_URL"),
-      git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"]
+    api_key = app_store_connect_api_key(
+      key_id: key_id,
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_filepath: key_path,
+      in_house: false
     )
 
     # Byggnummer = løpenummeret til CI-kjøringen, så hver opplasting er unik.
@@ -41,19 +35,16 @@ platform :ios do
       build_number: ENV.fetch("GITHUB_RUN_NUMBER", Time.now.to_i.to_s)
     )
 
-    profil = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING][APP_ID]
-
     build_app(
       scheme: "CameraRelay",
       export_method: "app-store",
       project: "CameraRelay.xcodeproj",
-      # Manuell signering: match har allerede lagt riktig sertifikat og profil på plass,
-      # og automatisk signering ville prøvd å finne på noe eget.
-      xcargs: "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='#{profil}'",
-      export_options: {
-        signingStyle: "manual",
-        provisioningProfiles: { APP_ID => profil }
-      }
+      # Nøkkelen må gis til xcodebuild eksplisitt — den arver ikke fastlanes api_key.
+      xcargs: "-allowProvisioningUpdates " \
+              "-authenticationKeyPath #{key_path} " \
+              "-authenticationKeyID #{key_id} " \
+              "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}",
+      export_options: { signingStyle: "automatic" }
     )
 
     upload_to_testflight(
