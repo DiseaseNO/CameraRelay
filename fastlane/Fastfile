@@ -22,7 +22,9 @@ platform :ios do
     build_app(
       scheme: "CameraRelay",
       export_method: "app-store",
-      xcodeproj: "CameraRelay.xcodeproj",
+      # NB: build_app heter parameteren `project` — `xcodeproj` finnes bare på
+      # increment_build_number, og gir «Could not find option» her.
+      project: "CameraRelay.xcodeproj",
       export_options: { signingStyle: "automatic" }
     )
 
