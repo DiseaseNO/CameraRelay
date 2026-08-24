@@ -40,6 +40,10 @@ platform :ios do
 
     build_app(
       scheme: "CameraRelay",
+      # Release EKSPLISITT. Uten dette arkiverte Xcode med utviklings-signering og bad om
+      # en «iOS App Development»-profil — og laget et NYTT utviklingssertifikat for hver
+      # kjøring, til kontoens sertifikatkvote var brukt opp.
+      configuration: "Release",
       export_method: "app-store",
       project: "CameraRelay.xcodeproj",
       xcargs: signering,

@@ -77,7 +77,10 @@ jobs:
       - name: Generer Xcode-prosjektet
         run: xcodegen generate
         env:
-          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+          # BEVISST uten DEVELOPMENT_TEAM: simulator-jobben skal ikke snakke med Apple.
+          # Med team satt provisjonerte Xcode automatisk og lagde et nytt
+          # utviklingssertifikat per kjøring, til kvoten var full.
+          DEVELOPMENT_TEAM: ""
           BUILD_NUMBER: ${{ github.run_number }}
           # Navnet under ikonet. Må være unikt på App Store (ITMS-90129), derfor
           # en secret framfor hardkodet verdi — da kan det byttes uten kodeendring.
@@ -93,6 +96,9 @@ jobs:
             -configuration Debug \
             -derivedDataPath dd \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_STYLE=Manual \
             | tail -30
 
       # Hjemme-backend ligger bak en geoblokk, og GitHubs runnere står i USA. Å åpne
