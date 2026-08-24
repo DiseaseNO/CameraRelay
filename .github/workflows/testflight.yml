@@ -88,6 +88,9 @@ jobs:
             | tail -30
 
       - name: Start simulator og kjør appen
+        env:
+          TEST_SERVER: ${{ secrets.TEST_SERVER }}
+          TEST_TOKEN: ${{ secrets.TEST_TOKEN }}
         run: |
           # Velg en tilgjengelig iPhone-simulator uten å hardkode modellnavn —
           # runner-bildene bytter modeller mellom Xcode-versjoner.
@@ -97,7 +100,17 @@ jobs:
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" dd/Build/Products/Debug-iphonesimulator/CameraRelay.app
-          xcrun simctl launch "$UDID" no.gustavs1.camerarelay
+          # Hopp forbi paringsskjermen hvis et test-token er lagt inn som secret.
+          # Argumentene leses bare av DEBUG-bygg (se CameraRelayApp.swift), så dette
+          # finnes ikke i det som havner på TestFlight.
+          if [ -n "${TEST_SERVER:-}" ] && [ -n "${TEST_TOKEN:-}" ]; then
+            echo "starter med test-token (server: $TEST_SERVER)"
+            xcrun simctl launch "$UDID" no.gustavs1.camerarelay \
+              -server "$TEST_SERVER" -token "$TEST_TOKEN"
+          else
+            echo "ingen test-token satt — viser bare paringsskjermen"
+            xcrun simctl launch "$UDID" no.gustavs1.camerarelay
+          fi
 
           # Vent til appen faktisk ER i forgrunnen. Uten dette traff første skjermbilde
           # hjemskjermen, fordi oppstarten ikke var ferdig.
@@ -106,10 +119,10 @@ jobs:
                xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q camerarelay; then break; fi
             sleep 1
           done
-          sleep 6
-          xcrun simctl io "$UDID" screenshot skjerm-1-paring.png
-          sleep 4
-          xcrun simctl io "$UDID" screenshot skjerm-2-paring.png
+          sleep 8
+          xcrun simctl io "$UDID" screenshot skjerm-1-live.png
+          sleep 8
+          xcrun simctl io "$UDID" screenshot skjerm-2-live.png
 
           # Appens egen logg. `simctl launch --console-pty` i bakgrunnen ga en tom fil;
           # `log show` etterpå er både enklere og mer komplett.
