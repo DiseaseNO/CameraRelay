@@ -49,9 +49,9 @@ platform :ios do
       export_method: "app-store",
       project: "CameraRelay.xcodeproj",
       xcargs: signering,
-      # VIKTIG: eksporten er et EGET xcodebuild-kall og arver ikke xcargs. Uten dette
-      # feiler den med «Cloud signing permission error» selv om arkiveringen gikk fint.
-      export_xcargs: signering,
+      # IKKE sett export_xcargs med de samme argumentene: gym legger selv
+      # -authenticationKey* på eksport-steget når api_key er satt, og xcodebuild
+      # avviser at flagget oppgis to ganger.
       export_options: { signingStyle: "automatic" }
     )
 
