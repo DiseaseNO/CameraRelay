@@ -24,7 +24,7 @@ struct Spiller: View {
     var body: some View {
         VStack(spacing: 10) {
             GeometryReader { geo in
-                VideoPlayer(player: spiller)
+                VideoLag(spiller: spiller)
                     .scaleEffect(zoom)
                     .offset(skyv)
                     .clipped()

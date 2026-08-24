@@ -241,8 +241,8 @@ struct KameraOpptak: View {
                 Label(fritt ? "Fritt" : "Hendelser", systemImage: fritt ? "slider.horizontal.3" : "figure.walk")
                     .font(.caption2)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(fritt ? Farge.kjol.opacity(0.22) : Farge.kort2)
-                    .foregroundStyle(fritt ? Farge.kjol : Farge.dempet)
+                    .background(fritt ? Farge.ok.opacity(0.22) : Farge.kort2)
+                    .foregroundStyle(fritt ? Farge.ok : Farge.dempet)
                     .clipShape(Capsule())
             }
             Button("Nå") { gåTilNå() }
@@ -278,7 +278,7 @@ struct KameraOpptak: View {
                 if nåværende(k) {
                     Text("spilles").font(.caption2).foregroundStyle(Farge.aksent)
                 } else if erPåVei(k) {
-                    Text("slipp for å spille").font(.caption2).foregroundStyle(Farge.kjol)
+                    Text("slipp for å spille").font(.caption2).foregroundStyle(Farge.ok)
                 }
             }
             .padding(.horizontal, 2)
@@ -288,7 +288,7 @@ struct KameraOpptak: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(nåværende(k) ? Farge.aksent : (erPåVei(k) ? Farge.kjol : .clear),
+                .stroke(nåværende(k) ? Farge.aksent : (erPåVei(k) ? Farge.ok : .clear),
                         lineWidth: 2)
         )
     }

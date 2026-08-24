@@ -83,7 +83,7 @@ struct LiveKort: View {
             .padding(.horizontal, 12).padding(.vertical, 10)
 
             GeometryReader { geo in
-                VideoPlayer(player: spiller)
+                VideoLag(spiller: spiller)
                     .scaleEffect(zoom)
                     .offset(skyv)
                     .clipped()
@@ -140,7 +140,7 @@ struct Fullskjerm: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            VideoPlayer(player: spiller).ignoresSafeArea()
+            VideoLag(spiller: spiller).ignoresSafeArea()
             VStack {
                 HStack {
                     Button(action: lukk) {
