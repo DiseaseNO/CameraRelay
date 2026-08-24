@@ -23,6 +23,8 @@ struct KameraOpptak: View {
     @State private var øverst: Klipp.ID?
     /// Hindrer at programstyrt rulling trigger tidslinje-flytting i loop.
     @State private var ruller = false
+    /// Utsetter videobytte til rullingen har falt til ro.
+    @State private var byttOppgave: Task<Void, Never>?
     @State private var feil: String?
     @State private var laster = true
 
@@ -99,10 +101,19 @@ struct KameraOpptak: View {
                 .scrollPosition(id: $øverst, anchor: .top)
                 .onChange(of: øverst) { _, ny in
                     guard !ruller, let id = ny, let k = hendelser.first(where: { $0.id == id }) else { return }
+                    // Tidslinja følger med én gang …
                     withAnimation(.easeOut(duration: 0.2)) {
                         vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
                     }
                     hode = k.iv.start
+                    // … men videoen byttes først når rullingen faller til ro. Uten denne
+                    // pausen ville hver rad man ruller forbi startet sin egen avspilling.
+                    byttOppgave?.cancel()
+                    byttOppgave = Task {
+                        try? await Task.sleep(for: .milliseconds(350))
+                        guard !Task.isCancelled, øverst == id else { return }
+                        valgt = k
+                    }
                 }
                 .refreshable { await last() }
                 .onChange(of: påVei?.id) { _, ny in
