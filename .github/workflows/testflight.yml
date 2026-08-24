@@ -95,6 +95,23 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | tail -30
 
+      # Runneren er UTENFOR hjemmenettet — samme utsiktspunkt som en iPhone på mobilnett.
+      # Tester fra innsiden går ut og inn igjen (hairpin) og beviser ingenting om dette.
+      - name: Nås backend utenfra?
+        if: env.TEST_SERVER != ''
+        env:
+          TEST_SERVER: ${{ secrets.TEST_SERVER }}
+        continue-on-error: true
+        run: |
+          echo "--- DNS ---"
+          dig +short "$TEST_SERVER" || nslookup "$TEST_SERVER" || true
+          echo "--- TLS + health (maks 20 s) ---"
+          curl -sS -v --max-time 20 "https://$TEST_SERVER/api/health" 2>&1 | tail -25 || true
+          echo "--- svartid ---"
+          curl -s -o /dev/null --max-time 20 \
+            -w 'oppkobling=%{time_connect}s tls=%{time_appconnect}s total=%{time_total}s status=%{http_code}\n' \
+            "https://$TEST_SERVER/api/health" || echo "NÅDDE IKKE FRAM"
+
       - name: Start simulator og kjør appen
         env:
           TEST_SERVER: ${{ secrets.TEST_SERVER }}
