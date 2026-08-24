@@ -30,20 +30,28 @@ platform :ios do
     )
 
     # Byggnummer = løpenummeret til CI-kjøringen, så hver opplasting er unik.
+    # skip_info_plist: prosjektet har ingen Info.plist-FIL (den genereres av
+    # GENERATE_INFOPLIST_FILE), så forsøket på å redigere den leter etter «.../YES».
     increment_build_number(
       xcodeproj: "CameraRelay.xcodeproj",
-      build_number: ENV.fetch("GITHUB_RUN_NUMBER", Time.now.to_i.to_s)
+      build_number: ENV.fetch("GITHUB_RUN_NUMBER", Time.now.to_i.to_s),
+      skip_info_plist: true
     )
+
+    # Nøkkelen må gis til xcodebuild eksplisitt — den arver ikke fastlanes api_key.
+    signering = "-allowProvisioningUpdates " \
+                "-authenticationKeyPath #{key_path} " \
+                "-authenticationKeyID #{key_id} " \
+                "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}"
 
     build_app(
       scheme: "CameraRelay",
       export_method: "app-store",
       project: "CameraRelay.xcodeproj",
-      # Nøkkelen må gis til xcodebuild eksplisitt — den arver ikke fastlanes api_key.
-      xcargs: "-allowProvisioningUpdates " \
-              "-authenticationKeyPath #{key_path} " \
-              "-authenticationKeyID #{key_id} " \
-              "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}",
+      xcargs: signering,
+      # VIKTIG: eksporten er et EGET xcodebuild-kall og arver ikke xcargs. Uten dette
+      # feiler den med «Cloud signing permission error» selv om arkiveringen gikk fint.
+      export_xcargs: signering,
       export_options: { signingStyle: "automatic" }
     )
 
