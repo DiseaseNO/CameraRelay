@@ -59,11 +59,20 @@ targets:
         # Peker på Assets.xcassets/AppIcon.appiconset. Setter samtidig CFBundleIconName,
         # som App Store krever — uten den avvises opplastingen.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-      configs:
-        Release:
-          # UTEN DENNE ba arkiveringen om en «iOS App Development»-profil, selv med
-          # -configuration Release og export_method app-store: standardverdien for
-          # CODE_SIGN_IDENTITY er «Apple Development», og automatisk signering følger
-          # byggeinnstillingen — ikke eksportmetoden. Resultatet var et nytt
-          # utviklingssertifikat per kjøring til kontoens kvote var brukt opp.
-          CODE_SIGN_IDENTITY: "Apple Distribution"
+
+schemes:
+  CameraRelay:
+    build:
+      targets:
+        CameraRelay: all
+    run:
+      config: Debug
+    # ARKIVERING MÅ VÆRE RELEASE. XcodeGens standardskjema arkiverte med Debug, og da
+    # velger automatisk signering utviklings-identitet og ber om en «iOS App Development»-
+    # profil — som lagde et nytt utviklingssertifikat ved hver kjøring.
+    archive:
+      config: Release
+    profile:
+      config: Release
+    analyze:
+      config: Debug
