@@ -105,6 +105,21 @@ struct Spiller: View {
             .frame(height: 20)
 
             Text(mmss(total)).font(.caption.monospacedDigit()).foregroundStyle(Farge.dempet).frame(width: 42)
+
+            // Lyd av/på. Starter DEMPET: man blar ofte gjennom hendelser i situasjoner der
+            // plutselig lyd er upassende, og det er lettere å slå den på ved behov enn å
+            // rekke å slå den av.
+            Button {
+                dempet.toggle()
+                spiller.isMuted = dempet
+            } label: {
+                Image(systemName: dempet ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.footnote)
+                    .frame(width: 34, height: 34)
+                    .background(Farge.kort2)
+                    .foregroundStyle(dempet ? Farge.dempet : Farge.aksent)
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+            }
         }
     }
 
