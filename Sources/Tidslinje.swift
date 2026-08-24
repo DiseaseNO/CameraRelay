@@ -30,7 +30,11 @@ struct Tidslinje: View {
     // Ned til 1 minutt: da er et 40-sekunders klipp to tredjedeler av linja, og lengden
     // er umulig å misforstå. Zoom er det eneste som virkelig løser lengde på tidsakse.
     private let minSpenn: TimeInterval = 60
-    private let maksSpenn: TimeInterval = 24 * 3600   // ett døgn
+    // Maks 2 timer. Regnestykket: for at et 40-sekunders klipp skal bli minst 2 pt bredt
+    // på en ~360 pt linje, må vinduet være ≤ 7200 s. Zoomer man lenger ut, treffer alle
+    // streker minstebredden og linja LYVER om lengden. Da er det bedre å ikke tillate det —
+    // dagsnavigasjon gjøres med datopilene og lista, ikke ved å zoome ut i det uendelige.
+    private let maksSpenn: TimeInterval = 2 * 3600
 
     var body: some View {
         VStack(spacing: 4) {
@@ -116,6 +120,15 @@ struct Tidslinje: View {
             DragGesture(minimumDistance: 0)
                 .onChanged { g in
                     drar = true
+                    // Drar man UT av kanten, panorerer vinduet i stedet for at spillehodet
+                    // stopper. Nødvendig nå som man ikke kan zoome ut til hele døgnet.
+                    let b = geo.size.width
+                    if g.location.x < 0 || g.location.x > b {
+                        let over = g.location.x < 0 ? g.location.x : g.location.x - b
+                        let skritt = Double(over / max(b, 1)) * vindu.spenn * 0.35
+                        vindu.midt = min(vindu.midt.addingTimeInterval(skritt),
+                                         Date.now.addingTimeInterval(vindu.spenn / 2))
+                    }
                     hode = tid(g.location.x, geo)
                 }
                 .onEnded { _ in
