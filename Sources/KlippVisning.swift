@@ -17,7 +17,7 @@ struct KameraOpptak: View {
     @State private var dag: Date = Calendar.current.startOfDay(for: .now)
     @State private var vindu = Tidslinje.Vindu(midt: .now, spenn: 3 * 3600)
     @State private var hode: Date = .now
-    @State private var spiller: IntPakke?
+    @State private var valgt: Klipp?
     @State private var feil: String?
     @State private var laster = true
 
@@ -50,19 +50,15 @@ struct KameraOpptak: View {
         .navigationTitle(kameranavn)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Farge.flate, for: .navigationBar)
-        .fullScreenCover(item: $spiller) { p in
-            SpillerSkjerm(api: api, klipp: hendelser, start: p.verdi)
-        }
         .task { await last() }
     }
 
     private var innhold: some View {
         VStack(spacing: 0) {
+            spillerFelt
             datolinje
             Tidslinje(kamera: kamera, vindu: $vindu, hode: $hode) { iv in
-                if let i = hendelser.firstIndex(where: { $0.iv.sUnix == iv.sUnix }) {
-                    spiller = IntPakke(verdi: i)
-                }
+                if let k = hendelser.first(where: { $0.iv.sUnix == iv.sUnix }) { velg(k) }
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
@@ -80,8 +76,8 @@ struct KameraOpptak: View {
                 Text("Ingen hendelser denne dagen.").font(.subheadline).foregroundStyle(Farge.svak)
                 Spacer()
             } else {
-                List(Array(hendelser.enumerated()), id: \.element.id) { i, k in
-                    Button { spiller = IntPakke(verdi: i) } label: { rad(k) }
+                List(hendelser) { k in
+                    Button { velg(k) } label: { rad(k) }
                         .listRowBackground(Farge.flate)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 4, leading: 14, bottom: 4, trailing: 14))
@@ -91,6 +87,27 @@ struct KameraOpptak: View {
                 .refreshable { await last() }
             }
         }
+    }
+
+    /// Spilleren står ØVERST og blir stående. Trykk i lista eller på tidslinja bytter bare
+    /// kilden — ingen modal som åpnes og lukkes. Det er den store forskjellen på å bla
+    /// gjennom hendelser på en telefon og å åpne dem én for én.
+    private var spillerFelt: some View {
+        ZStack {
+            Rectangle().fill(.black)
+            if let k = valgt, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
+                Spiller(url: url, markering: k.markering, lengde: k.iv.lengde)
+                    .id(k.id)   // ny spiller per klipp — ellers henger forrige igjen
+            } else if hendelser.isEmpty {
+                Text("Ingen opptak å vise").font(.footnote).foregroundStyle(Farge.svak)
+            } else {
+                ProgressView().tint(Farge.dempet)
+            }
+        }
+        .aspectRatio(16.0 / 9.0, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
     }
 
     private var datolinje: some View {
@@ -141,10 +158,16 @@ struct KameraOpptak: View {
         )
     }
 
-    /// Hendelsen spillehodet står på markeres — ellers mister man orienteringen når man blar.
-    private func nåværende(_ k: Klipp) -> Bool {
-        let u = hode.timeIntervalSince1970
-        return u >= k.iv.sUnix - 1 && u <= k.iv.eUnix + 1
+    /// Hendelsen som spilles markeres — ellers mister man orienteringen når man blar.
+    private func nåværende(_ k: Klipp) -> Bool { valgt?.id == k.id }
+
+    /// Bytter kilde i spilleren og flytter spillehodet dit, så tidslinja følger med.
+    private func velg(_ k: Klipp) {
+        valgt = k
+        hode = k.iv.start
+        if k.iv.start < vindu.fra || k.iv.start > vindu.til {
+            vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
+        }
     }
 
     private var erIdag: Bool {
@@ -178,6 +201,8 @@ struct KameraOpptak: View {
         do {
             kameraer = try await api.tidslinje()
             feil = nil
+            // Start på nyeste hendelse — en tom spiller er ingen god førsteopplevelse.
+            if valgt == nil, let første = hendelser.first { velg(første) }
         } catch {
             feil = error.localizedDescription
         }
