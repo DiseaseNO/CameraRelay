@@ -125,21 +125,29 @@ final class API {
     /// spørrestrengen for medie-URL-ene. Backend godtar begge.
     private func url(_ sti: String, _ q: [String: String]) -> URL? {
         guard let vert, let token else { return nil }
-        var c = URLComponents()
-        c.scheme = "https"
-        c.host = vert
+        var c = URLComponents(string: grunnadresse(vert)) ?? URLComponents()
         c.percentEncodedPath = sti   // kameranavnet er allerede kodet av kod()
         var deler = q.map { URLQueryItem(name: $0.key, value: $0.value) }
         deler.append(URLQueryItem(name: "token", value: token))
         c.queryItems = deler
         return c.url
     }
+    /// Normalt https. I DEBUG godtar vi et skjema foran, slik at simulator-testene kan
+    /// peke på en lokal mock-backend — hjemme-backend ligger bak en geoblokk og skal ikke
+    /// åpnes for CI. Release-bygg tvinger alltid https.
+    private func grunnadresse(_ vert: String) -> String {
+        #if DEBUG
+        if vert.hasPrefix("http://") || vert.hasPrefix("https://") { return vert }
+        #endif
+        return "https://" + vert
+    }
+
     private func kod(_ s: String) -> String {
         s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
     }
 
     private func hent<T: Decodable>(_ type: T.Type, _ sti: String) async throws -> T {
-        guard let vert, let token, let u = URL(string: "https://\(vert)\(sti)") else { throw APIFeil.ingenServer }
+        guard let vert, let token, let u = URL(string: grunnadresse(vert) + sti) else { throw APIFeil.ingenServer }
         var rq = URLRequest(url: u)
         rq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         rq.timeoutInterval = 30
