@@ -27,7 +27,9 @@ struct Tidslinje: View {
     @State private var spennVedStart: TimeInterval = 0
     @State private var drar = false
 
-    private let minSpenn: TimeInterval = 300          // 5 min
+    // Ned til 1 minutt: da er et 40-sekunders klipp to tredjedeler av linja, og lengden
+    // er umulig å misforstå. Zoom er det eneste som virkelig løser lengde på tidsakse.
+    private let minSpenn: TimeInterval = 60
     private let maksSpenn: TimeInterval = 24 * 3600   // ett døgn
 
     var body: some View {
@@ -45,10 +47,13 @@ struct Tidslinje: View {
                             .offset(x: x(d.0, geo), y: 29)
                     }
 
-                    // hendelser: tynne streker i eksakt bredde
+                    // Hendelser i EKSAKT bredde. Gulvet er 1,5 pt — akkurat nok til at et
+                    // klipp ikke forsvinner helt, men lavt nok til at forskjellen mellom
+                    // 40 s og 70 s faktisk vises. Et høyere gulv (jeg hadde 2 pt) gjør alle
+                    // streker like brede og løy om lengden.
                     ForEach(synligeKlipp, id: \.sUnix) { iv in
                         Rectangle().fill(Farge.aksent)
-                            .frame(width: max(2, bredde(iv.lengde, geo)), height: 52)
+                            .frame(width: max(1.5, bredde(iv.lengde, geo)), height: 52)
                             .offset(x: x(iv.start, geo), y: -3)
                     }
 

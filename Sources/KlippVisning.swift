@@ -15,7 +15,9 @@ struct KameraOpptak: View {
 
     @State private var kameraer: [KameraTL] = []
     @State private var dag: Date = Calendar.current.startOfDay(for: .now)
-    @State private var vindu = Tidslinje.Vindu(midt: .now, spenn: 3 * 3600)
+    // 1 time som utgangspunkt: i et 3-timers vindu blir et 40-sekunders klipp
+    // drøyt ett punkt bredt, og da ser alle hendelser like lange ut.
+    @State private var vindu = Tidslinje.Vindu(midt: .now, spenn: 3600)
     @State private var hode: Date = .now
     @State private var valgt: Klipp?
     @State private var feil: String?
