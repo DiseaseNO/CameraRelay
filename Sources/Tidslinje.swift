@@ -48,10 +48,14 @@ struct Tidslinje: View {
 
                     // Dekning som TYNN SKINNE langs bunnen. Som fylt flate overdøvet den
                     // hendelsene fullstendig — og de er det man er ute etter.
+                    // I FRI MODUS er den grønne linja spolefeltet: den vokser og lyser opp,
+                    // fordi det er DER det finnes sammenhengende video å spole i.
                     ForEach(Array(dekning.enumerated()), id: \.offset) { _, d in
-                        Rectangle().fill(Farge.ok).opacity(0.55)
-                            .frame(width: max(1, bredde(d.1.timeIntervalSince(d.0), geo)), height: 4)
-                            .offset(x: x(d.0, geo), y: 29)
+                        RoundedRectangle(cornerRadius: fri ? 3 : 0)
+                            .fill(Farge.ok).opacity(fri ? 0.95 : 0.55)
+                            .frame(width: max(1, bredde(d.1.timeIntervalSince(d.0), geo)),
+                                   height: fri ? 12 : 4)
+                            .offset(x: x(d.0, geo), y: fri ? 22 : 29)
                     }
 
                     // Hendelser i EKSAKT bredde. Gulvet er 1,5 pt — akkurat nok til at et
@@ -108,7 +112,7 @@ struct Tidslinje: View {
         Text(hode, format: .dateTime.hour().minute().second())
             .font(.system(size: 11, weight: .medium).monospacedDigit())
             .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(drar ? Farge.aksent : Farge.kort2)
+            .background(drar ? (fri && !påDekning(hode) ? Farge.avvik : Farge.ok) : Farge.kort2)
             .foregroundStyle(drar ? Farge.flate : Farge.tekst)
             .clipShape(Capsule())
             .offset(x: geo.size.width / 2 - 34, y: 4)
@@ -139,8 +143,9 @@ struct Tidslinje: View {
                     drar = false
                     // Slipp = velg klippet markøren står på (eller nærmeste innen 5 min).
                     if fri {
-                        // Fri spoling: spill fra der markøren står, uansett om det finnes
-                        // en hendelse der. Intervallet er bare en bærer av tidspunktet.
+                        // Bare der det FINNES video. Utenfor den grønne linja er det
+                        // ingenting å spille, og å prøve ville bare gitt en feilmelding.
+                        guard påDekning(hode) else { return }
                         påValg(Intervall(s: "", e: "",
                                          sUnix: hode.timeIntervalSince1970,
                                          eUnix: hode.timeIntervalSince1970 + 40))
@@ -171,6 +176,11 @@ struct Tidslinje: View {
             guard e - s >= 2 else { return nil }
             return (Date(timeIntervalSince1970: s), Date(timeIntervalSince1970: e))
         }
+    }
+
+    /// Står markøren på et strekk med sammenhengende video?
+    func påDekning(_ t: Date) -> Bool {
+        dekning.contains { t >= $0.0.addingTimeInterval(-2) && t <= $0.1 }
     }
 
     private func nærmesteKlipp(_ t: Date) -> Intervall? {
