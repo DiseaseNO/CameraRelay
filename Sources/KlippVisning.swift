@@ -320,8 +320,14 @@ struct Kameraliste: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(kam.navn).font(.title3.weight(.semibold)).foregroundStyle(.white)
                     if let iv = siste {
-                        Text("siste \(iv.start.formatted(.dateTime.hour().minute()))  ·  \(kam.deteksjonsklipp.count) klipp")
-                            .font(.caption).foregroundStyle(.white.opacity(0.85))
+                        // Text(dato, format:) respekterer miljøets locale — `.formatted()`
+                        // gjør det IKKE, og ga «8:01 PM» selv med nb_NO satt på appen.
+                        HStack(spacing: 4) {
+                            Text("siste")
+                            Text(iv.start, format: .dateTime.hour().minute())
+                            Text("·  \(kam.deteksjonsklipp.count) klipp")
+                        }
+                        .font(.caption).foregroundStyle(.white.opacity(0.85))
                     } else {
                         Text("ingen klipp").font(.caption).foregroundStyle(.white.opacity(0.7))
                     }
