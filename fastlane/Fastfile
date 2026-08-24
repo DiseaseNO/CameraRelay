@@ -30,7 +30,13 @@ platform :ios do
     )
 
     # (Byggnummeret settes av XcodeGen fra $BUILD_NUMBER — se project.yml.
-    # increment_build_number virker ikke når Info.plist genereres.)
+    # increment_build_number virker ikke når Info.plist genereres av XcodeGen.)
+
+    # Nøkkelen må gis til xcodebuild eksplisitt — den arver ikke fastlanes api_key.
+    signering = "-allowProvisioningUpdates " \
+                "-authenticationKeyPath #{key_path} " \
+                "-authenticationKeyID #{key_id} " \
+                "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}"
 
     build_app(
       scheme: "CameraRelay",
