@@ -20,6 +20,9 @@ struct KameraOpptak: View {
     @State private var vindu = Tidslinje.Vindu(midt: .now, spenn: 3600)
     @State private var hode: Date = .now
     @State private var valgt: Klipp?
+    @State private var øverst: Klipp.ID?
+    /// Hindrer at programstyrt rulling trigger tidslinje-flytting i loop.
+    @State private var ruller = false
     @State private var feil: String?
     @State private var laster = true
 
@@ -78,14 +81,28 @@ struct KameraOpptak: View {
                 Text("Ingen hendelser denne dagen.").font(.subheadline).foregroundStyle(Farge.svak)
                 Spacer()
             } else {
-                List(hendelser) { k in
-                    Button { velg(k) } label: { rad(k) }
-                        .listRowBackground(Farge.flate)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 4, leading: 14, bottom: 4, trailing: 14))
+                // ScrollView framfor List: da kan vi følge hvilken hendelse som er øverst,
+                // og la tidslinja gli med når man ruller. Uten det mister man
+                // sammenhengen mellom lista og tiden.
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(hendelser) { k in
+                            Button { velg(k) } label: { rad(k) }
+                                .id(k.id)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+                    .scrollTargetLayout()
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+                .scrollPosition(id: $øverst, anchor: .top)
+                .onChange(of: øverst) { _, ny in
+                    guard !ruller, let id = ny, let k = hendelser.first(where: { $0.id == id }) else { return }
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
+                    }
+                    hode = k.iv.start
+                }
                 .refreshable { await last() }
             }
         }
@@ -287,26 +304,32 @@ struct Kameraliste: View {
 
     /// Nyeste hendelse som forhåndsvisning — da ser du hva kameraet sist fanget uten å
     /// gå inn, og du kjenner igjen kameraet på bildet framfor navnet.
+    /// Stort bilde per kamera, ikke fire små. Her skal man kjenne igjen STEDET på et blikk
+    /// og velge riktig kamera — ikke studere et hendelsesforløp. Det kommer inni.
     private func rad(_ kam: KameraTL) -> some View {
         let siste = kam.deteksjonsklipp.last
-        return HStack(spacing: 12) {
-            if let iv = siste {
-                Stripe(api: api, klipp: Klipp(kamera: kam.navn, iv: iv, alarm: kam.alarm(i: iv)))
-                    .frame(width: 108, height: 40)
-            } else {
-                RoundedRectangle(cornerRadius: 6).fill(Farge.kort2).frame(width: 108, height: 40)
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(kam.navn).font(.headline).foregroundStyle(Farge.tekst)
+        return VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .bottomLeading) {
                 if let iv = siste {
-                    Text("siste: \(iv.start.formatted(.dateTime.hour().minute()))  ·  \(kam.deteksjonsklipp.count) klipp")
-                        .font(.caption).foregroundStyle(Farge.dempet)
+                    EnkeltRamme(api: api, klipp: Klipp(kamera: kam.navn, iv: iv, alarm: kam.alarm(i: iv)))
                 } else {
-                    Text("ingen klipp").font(.caption).foregroundStyle(Farge.svak)
+                    Rectangle().fill(Farge.kort2).aspectRatio(16.0 / 9.0, contentMode: .fit)
                 }
+                LinearGradient(colors: [.clear, .black.opacity(0.75)],
+                               startPoint: .center, endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(kam.navn).font(.title3.weight(.semibold)).foregroundStyle(.white)
+                    if let iv = siste {
+                        Text("siste \(iv.start.formatted(.dateTime.hour().minute()))  ·  \(kam.deteksjonsklipp.count) klipp")
+                            .font(.caption).foregroundStyle(.white.opacity(0.85))
+                    } else {
+                        Text("ingen klipp").font(.caption).foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+                .padding(12)
             }
-            Spacer()
         }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.vertical, 4)
     }
 
@@ -349,5 +372,33 @@ struct Stripe: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// Viser ÉN ramme av recorderens film-stripe, i full bredde.
+///
+/// Stripa er fire rammer ved siden av hverandre (~1456×200). Ved å skalere den til fire
+/// ganger bredden og klippe, får vi den første rammen alene — stor nok til å kjenne igjen
+/// stedet med én gang. Ingen ekstra henting: det er samme bilde som lista bruker.
+struct EnkeltRamme: View {
+    let api: API
+    let klipp: Klipp
+
+    var body: some View {
+        GeometryReader { geo in
+            AsyncImage(url: api.stripeURL(kamera: klipp.kamera,
+                                          alarmUnix: (klipp.alarm ?? klipp.iv).sUnix)) { faser in
+                switch faser {
+                case .success(let bilde):
+                    bilde.resizable().scaledToFill()
+                        .frame(width: geo.size.width * 4, height: geo.size.height, alignment: .leading)
+                default:
+                    Rectangle().fill(Farge.kort2)
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+            .clipped()
+        }
+        .aspectRatio(16.0 / 9.0, contentMode: .fit)
     }
 }
