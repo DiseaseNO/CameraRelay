@@ -108,7 +108,9 @@ struct Spiller: View {
     }
 
     private var total: Double { lengde ?? varighet }
-    private func andel(_ t: Double) -> Double { total > 0 ? max(0, min(1, t / total)) : 0 }
+    // CGFloat, ikke Double: verdien ganges med `geo.size.width`, og Swift nekter å
+    // blande CGFloat og Double i et uttrykk.
+    private func andel(_ t: Double) -> CGFloat { total > 0 ? CGFloat(max(0, min(1, t / total))) : 0 }
     private func mmss(_ t: Double) -> String {
         guard t.isFinite, t >= 0 else { return "0:00" }
         return String(format: "%d:%02d", Int(t) / 60, Int(t) % 60)

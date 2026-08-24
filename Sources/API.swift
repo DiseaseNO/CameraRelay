@@ -63,8 +63,6 @@ final class API {
     private(set) var token: String? = Nøkkelring.les("token")
     var erKlar: Bool { vert != nil && token != nil }
 
-    private var base: URL? { vert.flatMap { URL(string: "https://\($0)") } }
-
     // MARK: paring
 
     /// Løser inn en paringskode fra dashbordet. Passordet ditt kommer aldri inn i appen —
@@ -120,21 +118,23 @@ final class API {
     /// AVURLAsset kan ikke sette Authorization-header selv, så tokenet må følge med i
     /// spørrestrengen for medie-URL-ene. Backend godtar begge.
     private func url(_ sti: String, _ q: [String: String]) -> URL? {
-        guard let base, let token else { return nil }
-        var c = URLComponents(url: base.appendingPathComponent(sti), resolvingAgainstBaseURL: false)
-        c?.percentEncodedPath = sti
+        guard let vert, let token else { return nil }
+        var c = URLComponents()
+        c.scheme = "https"
+        c.host = vert
+        c.percentEncodedPath = sti   // kameranavnet er allerede kodet av kod()
         var deler = q.map { URLQueryItem(name: $0.key, value: $0.value) }
         deler.append(URLQueryItem(name: "token", value: token))
-        c?.queryItems = deler
-        return c?.url
+        c.queryItems = deler
+        return c.url
     }
     private func kod(_ s: String) -> String {
         s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
     }
 
     private func hent<T: Decodable>(_ type: T.Type, _ sti: String) async throws -> T {
-        guard let base, let token else { throw APIFeil.ingenServer }
-        var rq = URLRequest(url: base.appendingPathComponent(sti))
+        guard let vert, let token, let u = URL(string: "https://\(vert)\(sti)") else { throw APIFeil.ingenServer }
+        var rq = URLRequest(url: u)
         rq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         rq.timeoutInterval = 30
         let (data, svar) = try await URLSession.shared.data(for: rq)

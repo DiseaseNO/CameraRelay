@@ -71,7 +71,9 @@ struct Paring: View {
         holderPå = true; feil = nil
         defer { holderPå = false }
         do {
-            try await api.par(vert: vert, kode: kode, enhetsnavn: UIDevice.current.name)
+            // UIDevice.current er main-actor-isolert; les navnet der før vi går async.
+            let enhetsnavn = await MainActor.run { UIDevice.current.name }
+            try await api.par(vert: vert, kode: kode, enhetsnavn: enhetsnavn)
         } catch {
             feil = error.localizedDescription
         }
