@@ -97,13 +97,29 @@ jobs:
           xcrun simctl boot "$UDID" || true
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" dd/Build/Products/Debug-iphonesimulator/CameraRelay.app
-          xcrun simctl launch --console-pty "$UDID" no.gustavs1.camerarelay > app-konsoll.txt 2>&1 &
-          sleep 12
-          xcrun simctl io "$UDID" screenshot skjerm-1-start.png
-          # Skriv inn en serveradresse for å se at feltene og knappen oppfører seg
-          xcrun simctl io "$UDID" screenshot skjerm-2.png
-          echo "--- appens konsollutskrift ---"
-          cat app-konsoll.txt || true
+          xcrun simctl launch "$UDID" no.gustavs1.camerarelay
+
+          # Vent til appen faktisk ER i forgrunnen. Uten dette traff første skjermbilde
+          # hjemskjermen, fordi oppstarten ikke var ferdig.
+          for i in $(seq 1 20); do
+            if xcrun simctl listapps "$UDID" >/dev/null 2>&1 && \
+               xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -q camerarelay; then break; fi
+            sleep 1
+          done
+          sleep 6
+          xcrun simctl io "$UDID" screenshot skjerm-1-paring.png
+          sleep 4
+          xcrun simctl io "$UDID" screenshot skjerm-2-paring.png
+
+          # Appens egen logg. `simctl launch --console-pty` i bakgrunnen ga en tom fil;
+          # `log show` etterpå er både enklere og mer komplett.
+          xcrun simctl spawn "$UDID" log show --style compact --last 3m \
+            --predicate 'processImagePath CONTAINS "CameraRelay"' > app-konsoll.txt 2>&1 || true
+          echo "--- siste linjer fra appen ---"
+          tail -40 app-konsoll.txt || true
+
+          # Eventuelle krasjrapporter
+          cp ~/Library/Logs/DiagnosticReports/CameraRelay* . 2>/dev/null || true
 
       - name: Last opp skjermbilder
         if: always()
