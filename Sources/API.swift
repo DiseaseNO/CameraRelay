@@ -35,7 +35,9 @@ struct KameraTL: Decodable, Hashable {
         alarmer.first { $0.sUnix >= klipp.sUnix - 2 && $0.sUnix <= klipp.eUnix + 2 }
     }
 }
-struct Tidslinje: Decodable { let kameraer: [KameraTL] }
+/// Svaret fra /api/kamera/tidslinje. Heter ikke bare «Tidslinje» fordi visningen
+/// med samme navn ville kollidert.
+struct TidslinjeSvar: Decodable { let kameraer: [KameraTL] }
 
 struct ParSvar: Decodable {
     let token: String
@@ -103,7 +105,7 @@ final class API {
     // MARK: data
 
     func tidslinje() async throws -> [KameraTL] {
-        try await hent(Tidslinje.self, "/api/kamera/tidslinje").kameraer
+        try await hent(TidslinjeSvar.self, "/api/kamera/tidslinje").kameraer
     }
 
     /// Film-stripa recorderen lager per hendelse: fire rammer i én JPEG (~1456x200).
