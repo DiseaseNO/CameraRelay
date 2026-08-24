@@ -48,8 +48,12 @@ går for eksempel ikke.
 
 ## CI
 
-`.github/workflows/testflight.yml` bygger på `macos`-runner og laster til TestFlight
-ved push til `main`. Nødvendige repository secrets:
+`.github/workflows/testflight.yml` har to jobber:
+
+- **`simulator`** kjører ved hver push: bygger, starter appen og laster opp skjermbilder.
+- **`build`** laster til TestFlight, men bare ved `workflow_dispatch` eller en tag.
+  Grunnen: under designarbeid bygger man mange ganger i timen, og Apple struper
+  opplastinger per app. Nødvendige repository secrets:
 
 | Secret | Hva |
 |---|---|

@@ -10,6 +10,11 @@ on:
 
 jobs:
   build:
+    # Laster IKKE opp ved hver push. Vi bygger mange ganger i timen under designarbeid,
+    # og Apple struper opplastinger per app. Simulator-jobben under kjører fortsatt alltid,
+    # så skjermbilder og kompilering sjekkes uansett — bare TestFlight venter til vi ber om det.
+    # Utløses av `workflow_dispatch` eller en tag (`git tag v1.2 && git push --tags`).
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
