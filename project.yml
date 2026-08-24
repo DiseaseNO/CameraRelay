@@ -21,18 +21,20 @@ targets:
     type: application
     platform: iOS
     sources: [Sources]
-    # Ekte Info.plist generert av XcodeGen, ikke INFOPLIST_KEY_*-byggeinnstillinger.
-    # Grunnen: UISupportedInterfaceOrientations MÅ være en LISTE. Som byggeinnstilling
-    # ble den skrevet som én kommaseparert streng, og App Store avviste bundlen med
-    # «Invalid bundle. The "UIInterfaceOrientationPortrait,..." key ...».
+    # Ekte Info.plist generert av XcodeGen — mer forutsigbart enn INFOPLIST_KEY_*-
+    # byggeinnstillinger når verdien er en liste.
     info:
       path: Info.plist
       properties:
         CFBundleDisplayName: Camera
         UIUserInterfaceStyle: Dark
         UILaunchScreen: {}
+        # ALLE FIRE må med. Appen bygges som universal (iPhone + iPad), og App Store
+        # avviser bundlen hvis iPad-multitasking ikke er dekket:
+        # «you need to include all of the ... orientations to support iPad multitasking».
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         # Lyd i bakgrunnen — gir også Picture-in-Picture for AVPlayer.
