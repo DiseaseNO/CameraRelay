@@ -123,8 +123,11 @@ final class API {
     /// Backend tar `?alarm=<unix>` og lager et vindu på −10/+30 s rundt tidspunktet, så vi
     /// forskyver 10 s fram for å starte omtrent der markøren står.
     func friOpptakURL(kamera: String, fra: Date) -> URL? {
+        // sub=1 = KONTINUERLIG opptak. Det er den grønne linja man spoler i; ber man om
+        // sub=2 (deteksjon) på et punkt uten hendelse, svarer recorderen tomt — og da
+        // kommer det ingen video.
         url("/api/kamera/\(kod(kamera))/opptak.m3u8",
-            ["alarm": String(Int(fra.timeIntervalSince1970) + 10), "sub": "2"])
+            ["alarm": String(Int(fra.timeIntervalSince1970) + 10), "sub": "1"])
     }
 
     func opptakURL(kamera: String, klipp: Intervall, sub: Int = 2) -> URL? {

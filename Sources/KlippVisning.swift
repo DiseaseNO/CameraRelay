@@ -116,17 +116,13 @@ struct KameraOpptak: View {
                         .onEnded { _ in fingerNede = false; planleggBytte() }
                 )
                 .onChange(of: øverst) { _, ny in
+                    // Rulling flytter BARE tidslinja, og UTEN animasjon. Å animere ved hver
+                    // rad som passerer — og enda verre, å bygge spilleren på nytt — gjorde
+                    // rullingen hakkete. Video byttes ved TRYKK; det er der man faktisk har
+                    // bestemt seg.
                     guard !ruller, let id = ny, let k = hendelser.first(where: { $0.id == id }) else { return }
-                    // Tidslinja følger med én gang …
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
-                    }
+                    vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
                     hode = k.iv.start
-                    // … men videoen byttes IKKE mens fingeren ligger på skjermen. Den
-                    // markeres blå som «hit er du på vei», og byttes først når du slipper
-                    // og rullingen har falt til ro.
-                    ventende = k
-                    if !fingerNede { planleggBytte() }
                 }
                 .refreshable { await last() }
                 .onChange(of: påVei?.id) { _, ny in
