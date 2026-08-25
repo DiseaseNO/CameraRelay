@@ -29,14 +29,29 @@ platform :ios do
       in_house: false
     )
 
+    # Signering via match: henter det EKSISTERENDE distribusjonssertifikatet fra
+    # sertifikat-repoet og lager (første gang) en appstore-profil for vår bundle-ID.
+    #
+    # Automatisk signering ble prøvd i tre varianter og ba hver gang om en
+    # «iOS App Development»-profil, som lagde et nytt utviklingssertifikat per kjøring
+    # til kontoens kvote var brukt opp. match gjenbruker ett sertifikat i stedet.
+    match(
+      type: "appstore",
+      app_identifier: APP_ID,
+      api_key: api_key,
+      readonly: false,          # første kjøring må få lage profilen for denne appen
+      git_url: ENV.fetch("MATCH_GIT_URL"),
+      git_basic_authorization: ENV["MATCH_GIT_BASIC_AUTHORIZATION"]
+    )
+
     # (Byggnummeret settes av XcodeGen fra $BUILD_NUMBER — se project.yml.
     # increment_build_number virker ikke når Info.plist genereres av XcodeGen.)
 
-    # Nøkkelen må gis til xcodebuild eksplisitt — den arver ikke fastlanes api_key.
-    signering = "-allowProvisioningUpdates " \
-                "-authenticationKeyPath #{key_path} " \
-                "-authenticationKeyID #{key_id} " \
-                "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}"
+    # Manuell signering: match har allerede lagt riktig sertifikat og profil på plass.
+    # -allowProvisioningUpdates er BEVISST borte — det er den som ba Apple om nye
+    # sertifikater. Profilnavnet kommer fra match.
+    profil = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING][APP_ID]
+    signering = "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='#{profil}'"
 
     build_app(
       scheme: "CameraRelay",
@@ -50,7 +65,10 @@ platform :ios do
       # IKKE sett export_xcargs med de samme argumentene: gym legger selv
       # -authenticationKey* på eksport-steget når api_key er satt, og xcodebuild
       # avviser at flagget oppgis to ganger.
-      export_options: { signingStyle: "automatic" }
+      export_options: {
+        signingStyle: "manual",
+        provisioningProfiles: { APP_ID => profil }
+      }
     )
 
     upload_to_testflight(

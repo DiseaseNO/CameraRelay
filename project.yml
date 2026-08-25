@@ -15,7 +15,7 @@ settings:
     # Settes fra miljøet ved `xcodegen generate` — ikke hardkodet, så andre kan bygge
     # prosjektet med sin egen Apple-konto uten å endre fila.
     DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
-    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_STYLE: Manual
 targets:
   CameraRelay:
     type: application
