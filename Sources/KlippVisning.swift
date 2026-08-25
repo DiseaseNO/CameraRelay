@@ -123,6 +123,7 @@ struct KameraOpptak: View {
                     guard !ruller, let id = ny, let k = hendelser.first(where: { $0.id == id }) else { return }
                     vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
                     hode = k.iv.start
+                    forhåndshent(rundt: id)
                 }
                 .refreshable { await last() }
                 .onChange(of: påVei?.id) { _, ny in
@@ -343,6 +344,17 @@ struct KameraOpptak: View {
         hode = .now
     }
 
+    /// Henter miniatyrbilder et stykke UTENFOR det synlige, i begge retninger — da føles
+    /// lista ferdig lastet uansett hvilken vei man ruller, uten å hente alle 250.
+    private func forhåndshent(rundt id: Klipp.ID) {
+        guard let i = hendelser.firstIndex(where: { $0.id == id }) else { return }
+        let fra = max(0, i - 12), til = min(hendelser.count - 1, i + 20)
+        guard fra <= til else { return }
+        Bildelager.delt.forhåndshent(hendelser[fra...til].compactMap {
+            api.stripeURL(kamera: $0.kamera, alarmUnix: ($0.alarm ?? $0.iv).sUnix)
+        })
+    }
+
     private func varighet(_ iv: Intervall) -> String {
         let d = Int(iv.lengde.rounded())
         return String(format: "%d:%02d", d / 60, d % 60)
@@ -355,7 +367,10 @@ struct KameraOpptak: View {
             kameraer = try await api.tidslinje()
             feil = nil
             // Start på nyeste hendelse — en tom spiller er ingen god førsteopplevelse.
-            if valgt == nil, let første = hendelser.first { velg(første) }
+            if valgt == nil, let første = hendelser.first {
+                velg(første)
+                forhåndshent(rundt: første.id)
+            }
         } catch {
             feil = error.localizedDescription
         }
@@ -470,44 +485,26 @@ struct Klipp: Identifiable {
 struct Stripe: View {
     let api: API
     let klipp: Klipp
-
     var body: some View {
-        AsyncImage(url: api.stripeURL(kamera: klipp.kamera,
-                                      alarmUnix: (klipp.alarm ?? klipp.iv).sUnix)) { faser in
-            switch faser {
-            // scaledToFit, ikke Fill: stripa er ~7:1 og ville flommet ut av raden og
-            // lagt seg bak teksten. Den skal vises HEL — det er hele poenget med den.
-            case .success(let bilde): bilde.resizable().scaledToFit()
-            default: Rectangle().fill(Farge.kort2)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        Mellomlagret(url: api.stripeURL(kamera: klipp.kamera,
+                                        alarmUnix: (klipp.alarm ?? klipp.iv).sUnix))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 
-/// Viser ÉN ramme av recorderens film-stripe, i full bredde.
-///
-/// Stripa er fire rammer ved siden av hverandre (~1456×200). Ved å skalere den til fire
-/// ganger bredden og klippe, får vi den første rammen alene — stor nok til å kjenne igjen
-/// stedet med én gang. Ingen ekstra henting: det er samme bilde som lista bruker.
+/// Viser ÉN ramme av film-stripa, i full bredde. Stripa er fire rammer ved siden av
+/// hverandre; ved å skalere den fire ganger og klippe får vi den første alene — stor nok
+/// til å kjenne igjen stedet med én gang.
 struct EnkeltRamme: View {
     let api: API
     let klipp: Klipp
-
     var body: some View {
         GeometryReader { geo in
-            AsyncImage(url: api.stripeURL(kamera: klipp.kamera,
-                                          alarmUnix: (klipp.alarm ?? klipp.iv).sUnix)) { faser in
-                switch faser {
-                case .success(let bilde):
-                    bilde.resizable().scaledToFill()
-                        .frame(width: geo.size.width * 4, height: geo.size.height, alignment: .leading)
-                default:
-                    Rectangle().fill(Farge.kort2)
-                }
-            }
-            .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
-            .clipped()
+            Mellomlagret(url: api.stripeURL(kamera: klipp.kamera,
+                                            alarmUnix: (klipp.alarm ?? klipp.iv).sUnix), fyll: true)
+                .frame(width: geo.size.width * 4, height: geo.size.height, alignment: .leading)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+                .clipped()
         }
         .aspectRatio(16.0 / 9.0, contentMode: .fit)
     }
