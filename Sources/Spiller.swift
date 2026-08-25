@@ -19,6 +19,9 @@ struct Spiller: View {
     @State private var zoomVedStart: CGFloat = 1
     @State private var skyvVedStart: CGSize = .zero
     @State private var observatør: Any?
+    /// Videoens EKTE sideforhold. Vi tvang 16:9 før, og da fikk alt som ikke er nøyaktig
+    /// 16:9 svarte kanter. Recorderens klipp varierer, så vi måler i stedet for å anta.
+    @State private var sideforhold: CGFloat = 16.0 / 9.0
 
     private let maksZoom: CGFloat = 6
 
@@ -56,8 +59,7 @@ struct Spiller: View {
                         }
                     }
             }
-            .aspectRatio(16/9, contentMode: .fit)
-            .background(.black)
+            .aspectRatio(sideforhold, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             bar
@@ -148,6 +150,12 @@ struct Spiller: View {
         ) { t in
             tid = t.seconds
             if let d = spiller.currentItem?.duration.seconds, d.isFinite, d > 0 { varighet = d }
+            // presentationSize er 0x0 til første bilde er dekodet, derfor leser vi den her
+            // og ikke ved oppstart. Når den kommer, legger rammen seg tett rundt bildet.
+            if let st = spiller.currentItem?.presentationSize, st.width > 0, st.height > 0 {
+                let nytt = st.width / st.height
+                if abs(nytt - sideforhold) > 0.01 { sideforhold = nytt }
+            }
         }
     }
     private func stopp() {

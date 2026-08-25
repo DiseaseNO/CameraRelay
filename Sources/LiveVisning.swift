@@ -42,7 +42,7 @@ struct LiveVisning: View {
                 set: { fullskjerm = $0?.rawValue }
             )) { n in
                 if let url = api.liveURL(kamera: n.rawValue) {
-                    Fullskjerm(navn: n.rawValue, url: url,
+                    Fullskjerm(api: api, navn: n.rawValue, url: url,
                                kamera: kameraer.first { $0.navn == n.rawValue }) { fullskjerm = nil }
                 }
             }
@@ -184,13 +184,20 @@ struct LiveKort: View {
 
 /// Full skjerm på tvers. Her er lyden PÅ — man går i fullskjerm nettopp for å følge med.
 struct Fullskjerm: View {
+    let api: API
     let navn: String
     let url: URL
-    /// Trengs for å finne nyeste ferdige 4K-opptak. Live er 720p transkodet av recorderen.
     var kamera: KameraTL?
     var lukk: () -> Void
 
     @State private var spiller = AVPlayer()
+    @State private var zoom: CGFloat = 1
+    @State private var skyv: CGSize = .zero
+    @State private var zoomVedStart: CGFloat = 1
+    @State private var skyvVedStart: CGSize = .zero
+    /// 4K må hentes fra recorderen og pakkes om før første bilde finnes. Uten en synlig
+    /// venteindikator ser knappen ut som den ikke gjorde noe.
+    @State private var laster4k = false
     // Lyd AV til man ber om det. Å åpne fullskjerm skal ikke plutselig gi lyd i rommet.
     @State private var dempet = true
     @State private var dra: CGFloat = 0
@@ -199,18 +206,42 @@ struct Fullskjerm: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            VideoLag(spiller: spiller).ignoresSafeArea()
-                .offset(y: dra)
-                .gesture(
-                    // Dra ned for å lukke — samme bevegelse som i Bilder og de fleste
-                    // fullskjermvisninger på iOS.
-                    DragGesture()
-                        .onChanged { g in dra = max(0, g.translation.height) }
-                        .onEnded { g in
-                            if g.translation.height > 120 { lukk() }
-                            else { withAnimation(.easeOut(duration: 0.2)) { dra = 0 } }
-                        }
-                )
+            GeometryReader { geo in
+                VideoLag(spiller: spiller)
+                    .scaleEffect(zoom)
+                    .offset(x: skyv.width, y: skyv.height + dra)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
+                    // Zoom manglet HELT i fullskjerm — all zoom-kode lå i kortet i lista.
+                    .highPriorityGesture(
+                        MagnifyGesture()
+                            .onChanged { g in
+                                zoom = min(max(1, zoomVedStart * g.magnification), 6)
+                                skyv = klem(skyv, zoom, geo.size)
+                            }
+                            .onEnded { _ in zoomVedStart = zoom }
+                    )
+                    // Ved 1x drar man for å LUKKE. Er bildet zoomet, panorerer man i det —
+                    // ellers ville hver granskning av et hjørne lukket visningen.
+                    .highPriorityGesture(
+                        DragGesture()
+                            .onChanged { g in
+                                if zoom > 1 {
+                                    skyv = klem(CGSize(width: skyvVedStart.width + g.translation.width,
+                                                       height: skyvVedStart.height + g.translation.height),
+                                                zoom, geo.size)
+                                } else {
+                                    dra = max(0, g.translation.height)
+                                }
+                            }
+                            .onEnded { g in
+                                if zoom > 1 { skyvVedStart = skyv; return }
+                                if g.translation.height > 120 { lukk() }
+                                else { withAnimation(.easeOut(duration: 0.2)) { dra = 0 } }
+                            }
+                    )
+            }
+            .ignoresSafeArea()
             VStack {
                 HStack {
                     Button(action: lukk) {
@@ -224,12 +255,21 @@ struct Fullskjerm: View {
                     Text(navn).font(.subheadline.weight(.medium)).foregroundStyle(.white)
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(.black.opacity(0.55)).clipShape(Capsule())
+                    if zoom > 1.02 {
+                        Button { zoom = 1; zoomVedStart = 1; skyv = .zero; skyvVedStart = .zero } label: {
+                            Text("\(zoom, specifier: "%.1f")×")
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 10).padding(.vertical, 8)
+                                .background(.black.opacity(0.55)).foregroundStyle(Farge.aksent)
+                                .clipShape(Capsule())
+                        }
+                    }
                     if firKilde != nil {
                         Button {
                             firK.toggle()
                             bytt()
                         } label: {
-                            Text(firK ? "720p" : "4K")
+                            Text(laster4k ? "…" : (firK ? "720p" : "4K"))
                                 .font(.caption.weight(.bold))
                                 .padding(.horizontal, 10).padding(.vertical, 8)
                                 .background(.black.opacity(0.55))
@@ -258,14 +298,30 @@ struct Fullskjerm: View {
     /// Ekte 4K i sanntid, ikke et opptak. Backend spinner opp en RTSP-remux ved behov og
     /// river den når ingen henter segmenter — derfor er den bare tilgjengelig herfra, i
     /// fullskjerm, og ikke som en knapp i lista.
-    private var firKilde: URL? {
-        API.delt?.live4kURL(kamera: kamera?.navn ?? navn)
+    private var firKilde: URL? { api.live4kURL(kamera: kamera?.navn ?? navn) }
+
+    private func klem(_ s: CGSize, _ z: CGFloat, _ r: CGSize) -> CGSize {
+        let mx = (z - 1) * r.width / 2, my = (z - 1) * r.height / 2
+        return CGSize(width: min(max(s.width, -mx), mx), height: min(max(s.height, -my), my))
     }
 
     private func bytt() {
         let kilde = firK ? (firKilde ?? url) : url
-        spiller.replaceCurrentItem(with: AVPlayerItem(url: kilde))
-        spiller.isMuted = dempet   // lyd PÅ i fullskjerm — man går hit for å følge med
+        // Backend må starte RTSP-uttrekket og samle tre segmenter før AVPlayer kan begynne.
+        // Det tar rundt seks sekunder, og uten dette flagget ser skjermen bare død ut.
+        laster4k = firK
+        let vare = AVPlayerItem(url: kilde)
+        spiller.replaceCurrentItem(with: vare)
+        spiller.isMuted = dempet
         spiller.play()
+        if firK {
+            Task {
+                for _ in 0..<40 {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    if vare.status == .failed || spiller.currentTime().seconds > 0 { break }
+                }
+                laster4k = false
+            }
+        }
     }
 }
