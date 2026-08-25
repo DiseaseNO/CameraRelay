@@ -222,7 +222,7 @@ struct Fullskjerm: View {
                             firK.toggle()
                             bytt()
                         } label: {
-                            Text(firK ? "LIVE" : "4K")
+                            Text(firK ? "720p" : "4K")
                                 .font(.caption.weight(.bold))
                                 .padding(.horizontal, 10).padding(.vertical, 8)
                                 .background(.black.opacity(0.55))
@@ -248,15 +248,11 @@ struct Fullskjerm: View {
         .onDisappear { spiller.pause() }
     }
 
-    /// Nyeste FERDIGE continuous-chunk i ekte 4K. Recorderen ferdigskriver fila litt etter
-    /// at chunken lukkes, derav 90 sekunders margin — uten den får man en halv fil.
+    /// Ekte 4K i sanntid, ikke et opptak. Backend spinner opp en RTSP-remux ved behov og
+    /// river den når ingen henter segmenter — derfor er den bare tilgjengelig herfra, i
+    /// fullskjerm, og ikke som en knapp i lista.
     private var firKilde: URL? {
-        guard let kam = kamera else { return nil }
-        let nå = Date().timeIntervalSince1970
-        guard let siste = kam.kontinuerlig
-            .filter({ nå - $0.eUnix > 90 })
-            .max(by: { $0.eUnix < $1.eUnix }) else { return nil }
-        return API.delt?.opptakURL(kamera: kam.navn, klipp: siste, sub: 1)
+        API.delt?.live4kURL(kamera: kamera?.navn ?? navn)
     }
 
     private func bytt() {
