@@ -422,13 +422,17 @@ struct Kameraliste: View {
                         ProgressView().tint(Farge.dempet)
                     }
                 } else {
-                    List(kameraer, id: \.navn) { kam in
-                        NavigationLink(value: kam.navn) { rad(kam) }
-                        .listRowBackground(Farge.kort)
-                        .listRowSeparatorTint(Farge.strek)
+                    // ScrollView med kort, ikke List: velgeren skal se ut som den på Live.
+                    // En List-rad kan ikke gi samme kortform med topplinje over bildet.
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(kameraer, id: \.navn) { kam in
+                                NavigationLink(value: kam.navn) { rad(kam) }
+                                    .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(12)
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                     .refreshable { await last() }
                 }
             }
@@ -448,41 +452,40 @@ struct Kameraliste: View {
         }
     }
 
-    /// Nyeste hendelse som forhåndsvisning — da ser du hva kameraet sist fanget uten å
-    /// gå inn, og du kjenner igjen kameraet på bildet framfor navnet.
-    /// Stort bilde per kamera, ikke fire små. Her skal man kjenne igjen STEDET på et blikk
-    /// og velge riktig kamera — ikke studere et hendelsesforløp. Det kommer inni.
+    /// Samme kortform som `LiveKort` på Live-fanen: topplinje med markør, navn og
+    /// utvid-hint, og bildet i full bredde under. Thomas ville ha én velger-form begge
+    /// steder, og likte live-varianten best.
+    ///
+    /// Forskjellen som må være der: dette er et STILLBILDE av nyeste hendelse — en
+    /// opptaksvelger kan ikke spille live. Alt annet er likt.
     private func rad(_ kam: KameraTL) -> some View {
         let siste = kam.deteksjonsklipp.last
         return VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
+            HStack {
+                Image(systemName: "figure.walk")
+                    .font(.caption2).foregroundStyle(Farge.aksent)
+                Text(kam.navn).foregroundStyle(Farge.tekst).font(.subheadline.weight(.medium))
+                Spacer()
                 if let iv = siste {
-                    EnkeltRamme(api: api, klipp: Klipp(kamera: kam.navn, iv: iv, alarm: kam.alarm(i: iv)))
-                } else {
-                    Rectangle().fill(Farge.kort2).aspectRatio(16.0 / 9.0, contentMode: .fit)
-                }
-                LinearGradient(colors: [.clear, .black.opacity(0.75)],
-                               startPoint: .center, endPoint: .bottom)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(kam.navn).font(.title3.weight(.semibold)).foregroundStyle(.white)
-                    if let iv = siste {
-                        // Text(dato, format:) respekterer miljøets locale — `.formatted()`
-                        // gjør det IKKE, og ga «8:01 PM» selv med nb_NO satt på appen.
-                        HStack(spacing: 4) {
-                            Text("siste")
-                            Text(iv.start, format: .dateTime.hour().minute())
-                            Text("·  \(kam.deteksjonsklipp.count) klipp")
-                        }
-                        .font(.caption).foregroundStyle(.white.opacity(0.85))
-                    } else {
-                        Text("ingen klipp").font(.caption).foregroundStyle(.white.opacity(0.7))
+                    HStack(spacing: 4) {
+                        Text(iv.start, format: .dateTime.hour().minute())
+                        Text("· \(kam.deteksjonsklipp.count)")
                     }
+                    .font(.caption).foregroundStyle(Farge.dempet)
                 }
-                .padding(12)
+                Image(systemName: "chevron.right")
+                    .font(.caption2).foregroundStyle(Farge.dempet)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+
+            if let iv = siste {
+                EnkeltRamme(api: api, klipp: Klipp(kamera: kam.navn, iv: iv, alarm: kam.alarm(i: iv)))
+            } else {
+                Rectangle().fill(Farge.kort2).aspectRatio(16.0 / 9.0, contentMode: .fit)
+                    .overlay(Text("ingen klipp").font(.caption).foregroundStyle(Farge.svak))
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.vertical, 4)
+        .kort()
     }
 
     private func last() async {

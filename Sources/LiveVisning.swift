@@ -93,6 +93,11 @@ struct LiveKort: View {
             // oppdatering virker. Utvid-knappen tar deg dit man kan granske bildet.
             VideoLag(spiller: spiller)
                 .aspectRatio(16.0 / 9.0, contentMode: .fit)
+                // Hele bildet er trykkflaten. onTapGesture, IKKE en gest som fanger dra —
+                // rulling og dra-ned-for-oppdatering har blitt brutt to ganger før av
+                // gester her, og et trykk stjeler ingenting fra dem.
+                .contentShape(Rectangle())
+                .onTapGesture { påFullskjerm() }
         }
         .kort()
         .overlay(alignment: .center) {
@@ -150,17 +155,9 @@ struct Fullskjerm: View {
     @State private var skyv: CGSize = .zero
     @State private var zoomVedStart: CGFloat = 1
     @State private var skyvVedStart: CGSize = .zero
-    /// 4K må hentes fra recorderen og pakkes om før første bilde finnes. Uten en synlig
-    /// venteindikator ser knappen ut som den ikke gjorde noe.
-    @State private var laster4k = false
-    /// Hvorfor AVPlayer eventuelt forkastet strømmen. Den VET det — `errorLog()` gir
-    /// HTTP-kode og en kommentar — men sier ingenting av seg selv, og et svart bilde uten
-    /// forklaring er umulig å feilsøke på avstand.
-    @State private var feil4k: String?
     // Lyd AV til man ber om det. Å åpne fullskjerm skal ikke plutselig gi lyd i rommet.
     @State private var dempet = true
     @State private var dra: CGFloat = 0
-    @State private var firK = false
 
     var body: some View {
         ZStack {
@@ -223,22 +220,6 @@ struct Fullskjerm: View {
                                 .clipShape(Capsule())
                         }
                     }
-                    if firKilde != nil {
-                        Button {
-                            firK.toggle()
-                            bytt()
-                        } label: {
-                            // Knappen viser hva du ER PÅ, ikke hva du bytter til. Den
-                            // motsatte lesningen er tvetydig: «4K» kan like gjerne bety
-                            // «du ser 4K» som «trykk for 4K», og da må man gjette.
-                            Text(laster4k ? "…" : (firK ? "4K" : "720p"))
-                                .font(.caption.weight(.bold))
-                                .padding(.horizontal, 10).padding(.vertical, 8)
-                                .background(.black.opacity(0.55))
-                                .foregroundStyle(firK ? Farge.aksent : Farge.ok)
-                                .clipShape(Capsule())
-                        }
-                    }
                     Button {
                         dempet.toggle(); spiller.isMuted = dempet
                     } label: {
@@ -251,16 +232,6 @@ struct Fullskjerm: View {
                 }
                 .padding()
                 Spacer()
-                if let feil4k {
-                    Text(feil4k)
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.white)
-                        .padding(10)
-                        .background(.red.opacity(0.75))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .padding(.horizontal, 12).padding(.bottom, 24)
-                        .textSelection(.enabled)
-                }
             }
         }
         .onAppear { bytt() }
@@ -270,49 +241,14 @@ struct Fullskjerm: View {
     /// Ekte 4K i sanntid, ikke et opptak. Backend spinner opp en RTSP-remux ved behov og
     /// river den når ingen henter segmenter — derfor er den bare tilgjengelig herfra, i
     /// fullskjerm, og ikke som en knapp i lista.
-    private var firKilde: URL? { api.live4kURL(kamera: kamera?.navn ?? navn) }
-
     private func klem(_ s: CGSize, _ z: CGFloat, _ r: CGSize) -> CGSize {
         let mx = (z - 1) * r.width / 2, my = (z - 1) * r.height / 2
         return CGSize(width: min(max(s.width, -mx), mx), height: min(max(s.height, -my), my))
     }
 
     private func bytt() {
-        let kilde = firK ? (firKilde ?? url) : url
-        // Backend må starte RTSP-uttrekket og samle tre segmenter før AVPlayer kan begynne.
-        // Det tar rundt seks sekunder, og uten dette flagget ser skjermen bare død ut.
-        laster4k = firK
-        feil4k = nil
-        let vare = AVPlayerItem(url: kilde)
-        spiller.replaceCurrentItem(with: vare)
+        spiller.replaceCurrentItem(with: AVPlayerItem(url: url))
         spiller.isMuted = dempet
         spiller.play()
-        guard firK else { return }
-
-        Task {
-            for _ in 0..<40 {
-                try? await Task.sleep(for: .milliseconds(400))
-                if spiller.currentTime().seconds > 0 { laster4k = false; return }
-                if let m = avvisning(vare) { feil4k = m; laster4k = false; return }
-            }
-            laster4k = false
-            feil4k = avvisning(vare) ?? "4K: ingen bilder på 16 s, ingen feil rapportert"
-        }
-    }
-
-    /// Plukker ut hvorfor strømmen ble avvist. `status == .failed` dekker bare de groveste
-    /// tilfellene; når AVPlayer forkaster en HLS-variant — feil kodek-streng, uleselig
-    /// segment — havner grunnen i `errorLog()` mens status forblir `.unknown` og bildet
-    /// bare er svart.
-    private func avvisning(_ vare: AVPlayerItem) -> String? {
-        if vare.status == .failed {
-            return "4K feilet: " + (vare.error?.localizedDescription ?? "ukjent")
-        }
-        if let e = vare.errorLog()?.events.last {
-            let kode = e.errorStatusCode
-            let tekst = e.errorComment ?? e.errorDomain
-            return "4K avvist (\(kode)): \(tekst)"
-        }
-        return nil
     }
 }
