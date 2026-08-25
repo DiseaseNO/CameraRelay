@@ -60,7 +60,10 @@ struct LiveVisning: View {
 }
 
 /// Ett kamera i lista. Spiller AV SEG SELV med én gang — man åpner ikke en kamera-app
-/// for å så måtte trykke play. Knip zoomer i bildet; knappen gir full skjerm på tvers.
+/// for å så måtte trykke play.
+///
+/// INGEN zoom her. Lista er til å se hva som skjer og velge kamera; skal man
+/// granske noe, går man i fullskjerm — der har man plassen til det.
 struct LiveKort: View {
     let navn: String
     let url: URL
@@ -72,10 +75,6 @@ struct LiveKort: View {
     @State private var stilleSiden = Date()
     @State private var vakt: Timer?
     @State private var stopp = false
-    @State private var zoom: CGFloat = 1
-    @State private var skyv: CGSize = .zero
-    @State private var zoomVedStart: CGFloat = 1
-    @State private var skyvVedStart: CGSize = .zero
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -83,12 +82,6 @@ struct LiveKort: View {
                 Circle().fill(Farge.ok).frame(width: 7, height: 7)
                 Text(navn).foregroundStyle(Farge.tekst).font(.subheadline.weight(.medium))
                 Spacer()
-                if zoom > 1.02 {
-                    Button { nullstill() } label: {
-                        Text("\(zoom, specifier: "%.1f")×").font(.caption2).foregroundStyle(Farge.aksent)
-                    }
-                    .padding(.trailing, 8)
-                }
                 Button(action: påFullskjerm) {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.footnote).foregroundStyle(Farge.dempet)
@@ -96,21 +89,10 @@ struct LiveKort: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
 
-            GeometryReader { geo in
-                VideoLag(spiller: spiller)
-                    .scaleEffect(zoom)
-                    .offset(skyv)
-                    .clipped()
-                    // Kniping må ha høy prioritet, ellers vinner ScrollViewens dra-gest og
-                    // zoom virker ikke. MEN: da spiste den også dra-ned-for-oppdatering,
-                    // som derfor bare virket på opptaksfanen. Løsningen er å bare kreve
-                    // dra-gesten når bildet FAKTISK er zoomet — ved 1× slipper vi den
-                    // forbi til ScrollView, så oppdatering virker igjen.
-                    .highPriorityGesture(knip(geo.size))
-                    .highPriorityGesture(panorer(geo.size), including: zoom > 1 ? .all : .subviews)
-            }
-            .aspectRatio(16.0 / 9.0, contentMode: .fit)
-            .background(.black)
+            // Ingen gester her: hele flaten tilhører rullingen, så dra-ned-for-
+            // oppdatering virker. Utvid-knappen tar deg dit man kan granske bildet.
+            VideoLag(spiller: spiller)
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
         }
         .kort()
         .overlay(alignment: .center) {
@@ -153,33 +135,6 @@ struct LiveKort: View {
         }
     }
 
-    private func knip(_ ramme: CGSize) -> some Gesture {
-        MagnifyGesture()
-            .onChanged { g in
-                zoom = min(max(1, zoomVedStart * g.magnification), 6)
-                skyv = klem(skyv, zoom, ramme)
-            }
-            .onEnded { _ in zoomVedStart = zoom }
-    }
-
-    /// Panorering i et zoomet bilde. Skilt fra knipingen så den kan slås helt av ved 1×.
-    private func panorer(_ ramme: CGSize) -> some Gesture {
-        DragGesture()
-            .onChanged { g in
-                guard zoom > 1 else { return }
-                skyv = klem(CGSize(width: skyvVedStart.width + g.translation.width,
-                                   height: skyvVedStart.height + g.translation.height), zoom, ramme)
-            }
-            .onEnded { _ in skyvVedStart = skyv }
-    }
-
-    /// Kanten skal aldri komme innenfor rammen når man drar et zoomet bilde.
-    private func klem(_ s: CGSize, _ z: CGFloat, _ r: CGSize) -> CGSize {
-        let mx = (z - 1) * r.width / 2, my = (z - 1) * r.height / 2
-        return CGSize(width: min(max(s.width, -mx), mx), height: min(max(s.height, -my), my))
-    }
-
-    private func nullstill() { zoom = 1; zoomVedStart = 1; skyv = .zero; skyvVedStart = .zero }
 }
 
 /// Full skjerm på tvers. Her er lyden PÅ — man går i fullskjerm nettopp for å følge med.
