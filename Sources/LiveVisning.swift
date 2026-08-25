@@ -224,11 +224,14 @@ struct Fullskjerm: View {
                             firK.toggle()
                             bytt()
                         } label: {
-                            Text(laster4k ? "…" : (firK ? "720p" : "4K"))
+                            // Knappen viser hva du ER PÅ, ikke hva du bytter til. Den
+                            // motsatte lesningen er tvetydig: «4K» kan like gjerne bety
+                            // «du ser 4K» som «trykk for 4K», og da må man gjette.
+                            Text(laster4k ? "…" : (firK ? "4K" : "720p"))
                                 .font(.caption.weight(.bold))
                                 .padding(.horizontal, 10).padding(.vertical, 8)
                                 .background(.black.opacity(0.55))
-                                .foregroundStyle(firK ? Farge.ok : Farge.aksent)
+                                .foregroundStyle(firK ? Farge.aksent : Farge.ok)
                                 .clipShape(Capsule())
                         }
                     }
