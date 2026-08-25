@@ -53,6 +53,7 @@ struct Innstillinger: View {
             }
             rad("Bilder hentet", "\(Bildelager.delt.antallHentet)")
             rad("Data til bilder", String(format: "%.1f MB", Double(Bildelager.delt.bytesHentet) / 1_048_576))
+            rad("Bilder som feilet", "\(Bildelager.delt.antallFeilet)")
         }
     }
 
