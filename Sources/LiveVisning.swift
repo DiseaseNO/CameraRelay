@@ -11,6 +11,9 @@ struct LiveVisning: View {
     /// Bumpes ved dra-ned. Brukes som `.id` på kortene, så spillerne bygges helt på nytt —
     /// å bare hente kameralista igjen hjelper ikke når det er STRØMMEN som har hengt seg.
     @State private var generasjon = 0
+    @State private var firK: Firk?
+
+    struct Firk: Identifiable { let kamera: String; let url: URL; var id: String { url.absoluteString } }
 
     var body: some View {
         NavigationStack {
@@ -20,7 +23,9 @@ struct LiveVisning: View {
                     LazyVStack(spacing: 12) {
                         ForEach(kameraer, id: \.navn) { kam in
                             if let url = api.liveURL(kamera: kam.navn) {
-                                LiveKort(navn: kam.navn, url: url) { fullskjerm = kam.navn }
+                                LiveKort(navn: kam.navn, url: url, kamera: kam,
+                                         påFullskjerm: { fullskjerm = kam.navn },
+                                         på4K: { firK = Firk(kamera: kam.navn, url: $0) })
                                     .id("\(kam.navn)-\(generasjon)")
                             }
                         }
@@ -42,6 +47,9 @@ struct LiveVisning: View {
                     Fullskjerm(navn: n.rawValue, url: url) { fullskjerm = nil }
                 }
             }
+            .fullScreenCover(item: $firK) { f in
+                Fullskjerm(navn: "\(f.kamera) · 4K", url: f.url) { firK = nil }
+            }
         }
         .task { await last() }
     }
@@ -59,7 +67,9 @@ struct LiveVisning: View {
 struct LiveKort: View {
     let navn: String
     let url: URL
+    let kamera: KameraTL
     var påFullskjerm: () -> Void
+    var på4K: (URL) -> Void
 
     @State private var spiller = AVPlayer()
     @State private var sisteTid: Double = -1
@@ -83,6 +93,15 @@ struct LiveKort: View {
                     }
                     .padding(.trailing, 8)
                 }
+                if let fk = firKilde {
+                    Button { på4K(fk) } label: {
+                        Text("4K").font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6).padding(.vertical, 3)
+                            .background(Farge.kort2).foregroundStyle(Farge.aksent)
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                    }
+                    .padding(.trailing, 8)
+                }
                 Button(action: påFullskjerm) {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.footnote).foregroundStyle(Farge.dempet)
@@ -95,7 +114,9 @@ struct LiveKort: View {
                     .scaleEffect(zoom)
                     .offset(skyv)
                     .clipped()
-                    .gesture(gester(geo.size))
+                    // highPriority: uten dette vinner ScrollViewens egen dra-gest, og
+                    // knipingen nådde aldri fram. Det var derfor zoom ikke virket på live.
+                    .highPriorityGesture(gester(geo.size))
             }
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .background(.black)
@@ -111,6 +132,17 @@ struct LiveKort: View {
         }
         .onAppear { start(); startVakt() }
         .onDisappear { vakt?.invalidate(); vakt = nil; spiller.pause() }
+    }
+
+    /// Live er 720p TRANSKODET av recorderen. Opptakene ligger i full 4K, så «4K» viser
+    /// den nyeste FERDIGE chunken — noen minutter bak sanntid, men i ekte oppløsning.
+    /// Recorderen ferdigskriver fila litt etter at chunken lukkes, derav 90 sekunders margin.
+    private var firKilde: URL? {
+        let nå = Date().timeIntervalSince1970
+        guard let siste = kamera.kontinuerlig
+            .filter({ nå - $0.eUnix > 90 })
+            .max(by: { $0.eUnix < $1.eUnix }) else { return nil }
+        return API.delt?.opptakURL(kamera: navn, klipp: siste, sub: 1)
     }
 
     private func start() {
@@ -175,11 +207,24 @@ struct Fullskjerm: View {
     var lukk: () -> Void
 
     @State private var spiller = AVPlayer()
+    @State private var dempet = false
+    @State private var dra: CGFloat = 0
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             VideoLag(spiller: spiller).ignoresSafeArea()
+                .offset(y: dra)
+                .gesture(
+                    // Dra ned for å lukke — samme bevegelse som i Bilder og de fleste
+                    // fullskjermvisninger på iOS.
+                    DragGesture()
+                        .onChanged { g in dra = max(0, g.translation.height) }
+                        .onEnded { g in
+                            if g.translation.height > 120 { lukk() }
+                            else { withAnimation(.easeOut(duration: 0.2)) { dra = 0 } }
+                        }
+                )
             VStack {
                 HStack {
                     Button(action: lukk) {
@@ -193,6 +238,15 @@ struct Fullskjerm: View {
                     Text(navn).font(.subheadline.weight(.medium)).foregroundStyle(.white)
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(.black.opacity(0.55)).clipShape(Capsule())
+                    Button {
+                        dempet.toggle(); spiller.isMuted = dempet
+                    } label: {
+                        Image(systemName: dempet ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .frame(width: 40, height: 40)
+                            .background(.black.opacity(0.55))
+                            .foregroundStyle(dempet ? .white.opacity(0.6) : .white)
+                            .clipShape(Circle())
+                    }
                 }
                 .padding()
                 Spacer()
@@ -200,7 +254,7 @@ struct Fullskjerm: View {
         }
         .onAppear {
             spiller.replaceCurrentItem(with: AVPlayerItem(url: url))
-            spiller.isMuted = false
+            spiller.isMuted = dempet   // lyd PÅ i fullskjerm — man går hit for å følge med
             spiller.play()
         }
         .onDisappear { spiller.pause() }

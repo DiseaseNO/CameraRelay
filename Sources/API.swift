@@ -61,11 +61,15 @@ enum APIFeil: LocalizedError {
 /// skrives inn ved paring og lagres i Keychain sammen med enhets-tokenet.
 @Observable
 final class API {
+    /// Delt referanse, så små visninger slipper å få API sendt gjennom flere ledd.
+    static private(set) var delt: API?
+
     private(set) var vert: String? = Nøkkelring.les("vert")
     private(set) var token: String? = Nøkkelring.les("token")
     var erKlar: Bool { vert != nil && token != nil }
 
     init() {
+        API.delt = self
         #if DEBUG
         NSLog("CR-API: vert=\(vert ?? "nil") token=\(token != nil ? "ok" : "nil") erKlar=\(erKlar)")
         #endif
