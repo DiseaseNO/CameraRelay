@@ -11,9 +11,7 @@ struct LiveVisning: View {
     /// Bumpes ved dra-ned. Brukes som `.id` på kortene, så spillerne bygges helt på nytt —
     /// å bare hente kameralista igjen hjelper ikke når det er STRØMMEN som har hengt seg.
     @State private var generasjon = 0
-    @State private var firK: Firk?
 
-    struct Firk: Identifiable { let kamera: String; let url: URL; var id: String { url.absoluteString } }
 
     var body: some View {
         NavigationStack {
@@ -23,9 +21,9 @@ struct LiveVisning: View {
                     LazyVStack(spacing: 12) {
                         ForEach(kameraer, id: \.navn) { kam in
                             if let url = api.liveURL(kamera: kam.navn) {
-                                LiveKort(navn: kam.navn, url: url, kamera: kam,
-                                         påFullskjerm: { fullskjerm = kam.navn },
-                                         på4K: { firK = Firk(kamera: kam.navn, url: $0) })
+                                LiveKort(navn: kam.navn, url: url, kamera: kam) {
+                                    fullskjerm = kam.navn
+                                }
                                     .id("\(kam.navn)-\(generasjon)")
                             }
                         }
@@ -44,12 +42,11 @@ struct LiveVisning: View {
                 set: { fullskjerm = $0?.rawValue }
             )) { n in
                 if let url = api.liveURL(kamera: n.rawValue) {
-                    Fullskjerm(navn: n.rawValue, url: url) { fullskjerm = nil }
+                    Fullskjerm(navn: n.rawValue, url: url,
+                               kamera: kameraer.first { $0.navn == n.rawValue }) { fullskjerm = nil }
                 }
             }
-            .fullScreenCover(item: $firK) { f in
-                Fullskjerm(navn: "\(f.kamera) · 4K", url: f.url) { firK = nil }
-            }
+
         }
         .task { await last() }
     }
@@ -69,7 +66,6 @@ struct LiveKort: View {
     let url: URL
     let kamera: KameraTL
     var påFullskjerm: () -> Void
-    var på4K: (URL) -> Void
 
     @State private var spiller = AVPlayer()
     @State private var sisteTid: Double = -1
@@ -90,15 +86,6 @@ struct LiveKort: View {
                 if zoom > 1.02 {
                     Button { nullstill() } label: {
                         Text("\(zoom, specifier: "%.1f")×").font(.caption2).foregroundStyle(Farge.aksent)
-                    }
-                    .padding(.trailing, 8)
-                }
-                if let fk = firKilde {
-                    Button { på4K(fk) } label: {
-                        Text("4K").font(.caption2.weight(.bold))
-                            .padding(.horizontal, 6).padding(.vertical, 3)
-                            .background(Farge.kort2).foregroundStyle(Farge.aksent)
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
                     }
                     .padding(.trailing, 8)
                 }
@@ -132,17 +119,6 @@ struct LiveKort: View {
         }
         .onAppear { start(); startVakt() }
         .onDisappear { vakt?.invalidate(); vakt = nil; spiller.pause() }
-    }
-
-    /// Live er 720p TRANSKODET av recorderen. Opptakene ligger i full 4K, så «4K» viser
-    /// den nyeste FERDIGE chunken — noen minutter bak sanntid, men i ekte oppløsning.
-    /// Recorderen ferdigskriver fila litt etter at chunken lukkes, derav 90 sekunders margin.
-    private var firKilde: URL? {
-        let nå = Date().timeIntervalSince1970
-        guard let siste = kamera.kontinuerlig
-            .filter({ nå - $0.eUnix > 90 })
-            .max(by: { $0.eUnix < $1.eUnix }) else { return nil }
-        return API.delt?.opptakURL(kamera: navn, klipp: siste, sub: 1)
     }
 
     private func start() {
@@ -204,11 +180,14 @@ struct LiveKort: View {
 struct Fullskjerm: View {
     let navn: String
     let url: URL
+    /// Trengs for å finne nyeste ferdige 4K-opptak. Live er 720p transkodet av recorderen.
+    var kamera: KameraTL?
     var lukk: () -> Void
 
     @State private var spiller = AVPlayer()
     @State private var dempet = false
     @State private var dra: CGFloat = 0
+    @State private var firK = false
 
     var body: some View {
         ZStack {
@@ -238,6 +217,19 @@ struct Fullskjerm: View {
                     Text(navn).font(.subheadline.weight(.medium)).foregroundStyle(.white)
                         .padding(.horizontal, 12).padding(.vertical, 6)
                         .background(.black.opacity(0.55)).clipShape(Capsule())
+                    if firKilde != nil {
+                        Button {
+                            firK.toggle()
+                            bytt()
+                        } label: {
+                            Text(firK ? "LIVE" : "4K")
+                                .font(.caption.weight(.bold))
+                                .padding(.horizontal, 10).padding(.vertical, 8)
+                                .background(.black.opacity(0.55))
+                                .foregroundStyle(firK ? Farge.ok : Farge.aksent)
+                                .clipShape(Capsule())
+                        }
+                    }
                     Button {
                         dempet.toggle(); spiller.isMuted = dempet
                     } label: {
@@ -252,11 +244,25 @@ struct Fullskjerm: View {
                 Spacer()
             }
         }
-        .onAppear {
-            spiller.replaceCurrentItem(with: AVPlayerItem(url: url))
-            spiller.isMuted = dempet   // lyd PÅ i fullskjerm — man går hit for å følge med
-            spiller.play()
-        }
+        .onAppear { bytt() }
         .onDisappear { spiller.pause() }
+    }
+
+    /// Nyeste FERDIGE continuous-chunk i ekte 4K. Recorderen ferdigskriver fila litt etter
+    /// at chunken lukkes, derav 90 sekunders margin — uten den får man en halv fil.
+    private var firKilde: URL? {
+        guard let kam = kamera else { return nil }
+        let nå = Date().timeIntervalSince1970
+        guard let siste = kam.kontinuerlig
+            .filter({ nå - $0.eUnix > 90 })
+            .max(by: { $0.eUnix < $1.eUnix }) else { return nil }
+        return API.delt?.opptakURL(kamera: kam.navn, klipp: siste, sub: 1)
+    }
+
+    private func bytt() {
+        let kilde = firK ? (firKilde ?? url) : url
+        spiller.replaceCurrentItem(with: AVPlayerItem(url: kilde))
+        spiller.isMuted = dempet   // lyd PÅ i fullskjerm — man går hit for å følge med
+        spiller.play()
     }
 }
