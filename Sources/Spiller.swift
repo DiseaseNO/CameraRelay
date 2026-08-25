@@ -26,7 +26,7 @@ struct Spiller: View {
     private let maksZoom: CGFloat = 6
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             GeometryReader { geo in
                 VideoLag(spiller: spiller)
                     .scaleEffect(zoom)
@@ -59,6 +59,10 @@ struct Spiller: View {
                         }
                     }
             }
+            // maxWidth FØRST: uten den blir rammen høydebegrenset av det som ligger under,
+            // og `.fit` krymper da bredden i stedet — det var de svarte sidekantene. Nå
+            // tar bildet full bredde, og høyden følger av videoens eget sideforhold.
+            .frame(maxWidth: .infinity)
             .aspectRatio(sideforhold, contentMode: .fit)
 
 

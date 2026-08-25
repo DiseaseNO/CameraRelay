@@ -69,7 +69,7 @@ struct Tidslinje: View {
                     // streker like brede og løy om lengden.
                     ForEach(synligeKlipp, id: \.sUnix) { iv in
                         Rectangle().fill(Farge.aksent)
-                            .frame(width: max(1.5, bredde(iv.lengde, geo)), height: 52)
+                            .frame(width: max(1.5, bredde(iv.lengde, geo)), height: 38)
                             .offset(x: x(iv.start, geo), y: -3)
                     }
 
@@ -84,12 +84,12 @@ struct Tidslinje: View {
                         .offset(x: geo.size.width / 2 - 1)
                         .shadow(color: .black.opacity(0.6), radius: 2)
                 }
-                .frame(height: 62)
+                .frame(height: 46)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .contentShape(Rectangle())
                 .gesture(gester(geo))
             }
-            .frame(height: 62)
+            .frame(height: 46)
         }
     }
 
@@ -109,7 +109,7 @@ struct Tidslinje: View {
                 }
             }
         }
-        .frame(height: 18)
+        .frame(height: 15)
     }
 
     /// Tidsboble over spillehodet — den gjør dragingen presis i stedet for omtrentlig.

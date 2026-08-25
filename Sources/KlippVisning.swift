@@ -74,7 +74,9 @@ struct KameraOpptak: View {
 
     private var innhold: some View {
         VStack(spacing: 0) {
-            spillerFelt
+            // Spilleren har forrang på plassen. Uten dette gir VStacken den bare det som
+            // blir til overs, og bildet krymper i bredden.
+            spillerFelt.layoutPriority(1)
             datolinje
             // Å slippe tidslinja VELGER bare. Ingenting starter av seg selv — det var
             // nettopp autostarten som gjorde bladring stressende.
@@ -87,8 +89,8 @@ struct KameraOpptak: View {
                 else if let k = valgt { spill(k) }
             }
             .padding(.horizontal, 14)
-            .padding(.top, 14)
-            .padding(.bottom, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
 
             HStack {
                 Text("Oppdagede hendelser (\(hendelser.count))")
@@ -264,7 +266,7 @@ struct KameraOpptak: View {
             Button("Nå") { gåTilNå() }
                 .font(.caption).foregroundStyle(Farge.aksent)
         }
-        .padding(.horizontal, 16).padding(.top, 12)
+        .padding(.horizontal, 16).padding(.top, 8)
     }
 
     /// Rad: film-stripa i FULL BREDDE øverst, metadata under.
