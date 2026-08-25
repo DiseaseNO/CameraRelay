@@ -53,7 +53,7 @@ struct LiveVisning: View {
 
     private func last() async {
         do { kameraer = try await api.tidslinje(); feil = nil }
-        catch { feil = error.localizedDescription }
+        catch { if !erAvbrutt(error) { feil = error.localizedDescription } }
     }
 
     struct Navn: Identifiable { let rawValue: String; var id: String { rawValue } }

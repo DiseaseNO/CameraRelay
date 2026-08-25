@@ -175,3 +175,14 @@ final class API {
         return try JSONDecoder().decode(T.self, from: data)
     }
 }
+
+/// En avbrutt forespørsel er ikke en feil.
+///
+/// SwiftUIs `.task` kansellerer det som er underveis når visningen forsvinner — bytter du
+/// fane mens tidslinja lastes, får vi `NSURLErrorCancelled` (-999). Å vise «cancelled» i
+/// rødt får en helt normal hendelse til å se ut som at noe er ødelagt.
+func erAvbrutt(_ feil: Error) -> Bool {
+    if feil is CancellationError { return true }
+    let n = feil as NSError
+    return n.domain == NSURLErrorDomain && n.code == NSURLErrorCancelled
+}

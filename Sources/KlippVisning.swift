@@ -396,7 +396,8 @@ struct KameraOpptak: View {
                 forhåndshent(rundt: første.id)
             }
         } catch {
-            feil = error.localizedDescription
+            // Avbrutt forespørsel = fanebytte, ikke en feil verdt å vise.
+            if !erAvbrutt(error) { feil = error.localizedDescription }
         }
     }
 }
@@ -484,7 +485,7 @@ struct Kameraliste: View {
 
     private func last() async {
         do { kameraer = try await api.tidslinje(); feil = nil }
-        catch { feil = error.localizedDescription }
+        catch { if !erAvbrutt(error) { feil = error.localizedDescription } }
     }
 }
 
