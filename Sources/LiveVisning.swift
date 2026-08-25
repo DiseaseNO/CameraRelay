@@ -101,9 +101,13 @@ struct LiveKort: View {
                     .scaleEffect(zoom)
                     .offset(skyv)
                     .clipped()
-                    // highPriority: uten dette vinner ScrollViewens egen dra-gest, og
-                    // knipingen nådde aldri fram. Det var derfor zoom ikke virket på live.
-                    .highPriorityGesture(gester(geo.size))
+                    // Kniping må ha høy prioritet, ellers vinner ScrollViewens dra-gest og
+                    // zoom virker ikke. MEN: da spiste den også dra-ned-for-oppdatering,
+                    // som derfor bare virket på opptaksfanen. Løsningen er å bare kreve
+                    // dra-gesten når bildet FAKTISK er zoomet — ved 1× slipper vi den
+                    // forbi til ScrollView, så oppdatering virker igjen.
+                    .highPriorityGesture(knip(geo.size))
+                    .highPriorityGesture(panorer(geo.size), including: zoom > 1 ? .all : .subviews)
             }
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .background(.black)
@@ -149,22 +153,24 @@ struct LiveKort: View {
         }
     }
 
-    private func gester(_ ramme: CGSize) -> some Gesture {
-        SimultaneousGesture(
-            MagnifyGesture()
-                .onChanged { g in
-                    zoom = min(max(1, zoomVedStart * g.magnification), 6)
-                    skyv = klem(skyv, zoom, ramme)
-                }
-                .onEnded { _ in zoomVedStart = zoom },
-            DragGesture()
-                .onChanged { g in
-                    guard zoom > 1 else { return }
-                    skyv = klem(CGSize(width: skyvVedStart.width + g.translation.width,
-                                       height: skyvVedStart.height + g.translation.height), zoom, ramme)
-                }
-                .onEnded { _ in skyvVedStart = skyv }
-        )
+    private func knip(_ ramme: CGSize) -> some Gesture {
+        MagnifyGesture()
+            .onChanged { g in
+                zoom = min(max(1, zoomVedStart * g.magnification), 6)
+                skyv = klem(skyv, zoom, ramme)
+            }
+            .onEnded { _ in zoomVedStart = zoom }
+    }
+
+    /// Panorering i et zoomet bilde. Skilt fra knipingen så den kan slås helt av ved 1×.
+    private func panorer(_ ramme: CGSize) -> some Gesture {
+        DragGesture()
+            .onChanged { g in
+                guard zoom > 1 else { return }
+                skyv = klem(CGSize(width: skyvVedStart.width + g.translation.width,
+                                   height: skyvVedStart.height + g.translation.height), zoom, ramme)
+            }
+            .onEnded { _ in skyvVedStart = skyv }
     }
 
     /// Kanten skal aldri komme innenfor rammen når man drar et zoomet bilde.
@@ -185,7 +191,8 @@ struct Fullskjerm: View {
     var lukk: () -> Void
 
     @State private var spiller = AVPlayer()
-    @State private var dempet = false
+    // Lyd AV til man ber om det. Å åpne fullskjerm skal ikke plutselig gi lyd i rommet.
+    @State private var dempet = true
     @State private var dra: CGFloat = 0
     @State private var firK = false
 

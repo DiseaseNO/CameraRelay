@@ -17,7 +17,10 @@ struct Tidslinje: View {
     @Binding var hode: Date
     /// I fri modus kalles `påValg` uansett hvor man slipper — også utenfor hendelser.
     var fri: Bool = false
+    /// Dra og slipp = VELG. Starter ikke avspilling.
     var påValg: (Intervall) -> Void
+    /// Trykk uten å dra = SPILL det som er valgt.
+    var påTrykk: () -> Void = {}
 
     struct Vindu: Equatable {
         var midt: Date
@@ -28,6 +31,8 @@ struct Tidslinje: View {
 
     @State private var spennVedStart: TimeInterval = 0
     @State private var drar = false
+    /// Skiller et ekte dra fra et trykk.
+    @State private var flyttet = false
     @State private var midtVedStart: Date = .now
 
     // Ned til 1 minutt: da er et 40-sekunders klipp to tredjedeler av linja, og lengden
@@ -132,7 +137,8 @@ struct Tidslinje: View {
                 .onEnded { _ in spennVedStart = 0 },
             DragGesture(minimumDistance: 0)
                 .onChanged { g in
-                    if !drar { drar = true; midtVedStart = vindu.midt }
+                    if !drar { drar = true; midtVedStart = vindu.midt; flyttet = false }
+                    if abs(g.translation.width) > 8 { flyttet = true }
                     // Dra mot venstre = framover i tid. Vinduet flyttes, ikke markøren.
                     let flytt = Double(-g.translation.width / max(geo.size.width, 1)) * vindu.spenn
                     let ny = midtVedStart.addingTimeInterval(flytt)
@@ -141,6 +147,10 @@ struct Tidslinje: View {
                 }
                 .onEnded { _ in
                     drar = false
+                    // Et trykk er en «dra» på null piksler. Skiller vi ikke på det, ville
+                    // hvert trykk også flyttet vinduet — og trykk er nettopp det som skal
+                    // STARTE avspilling, ikke velge på nytt.
+                    guard flyttet else { påTrykk(); return }
                     // Slipp = velg klippet markøren står på (eller nærmeste innen 5 min).
                     if fri {
                         // Bare der det FINNES video. Utenfor den grønne linja er det

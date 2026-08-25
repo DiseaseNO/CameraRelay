@@ -19,14 +19,17 @@ struct KameraOpptak: View {
     // drøyt ett punkt bredt, og da ser alle hendelser like lange ut.
     @State private var vindu = Tidslinje.Vindu(midt: .now, spenn: 3600)
     @State private var hode: Date = .now
+    /// BLÅ ramme: hendelsen du har rullet fram til. Ingenting spilles av den grunn.
     @State private var valgt: Klipp?
+    /// ORANSJE ramme: hendelsen som faktisk spilles. Settes KUN ved trykk.
+    @State private var spilles: Klipp?
     @State private var øverst: Klipp.ID?
     /// Hindrer at programstyrt rulling trigger tidslinje-flytting i loop.
     @State private var ruller = false
-    /// Utsetter videobytte til rullingen har falt til ro.
-    @State private var byttOppgave: Task<Void, Never>?
-    @State private var fingerNede = false
-    @State private var ventende: Klipp?
+    /// Hendelsene på valgt dag, hurtiglagret. Var en beregnet variabel før, og det var
+    /// årsaken til hakkingen: den filtrerte, mappet og sorterte ~250 klipp på nytt hver
+    /// eneste gang noe leste den — flere ganger per rullebilde.
+    @State private var hendelser: [Klipp] = []
     @State private var fullskjerm = false
     /// Fri spoling: slipp hvor som helst og spill derfra, i stedet for å hoppe til nærmeste
     /// hendelse. Et EKSTRA valg — hendelseshopping er fortsatt standard, for det er det man
@@ -38,11 +41,12 @@ struct KameraOpptak: View {
 
     private var kamera: KameraTL? { kameraer.first { $0.navn == kameranavn } }
 
-    /// Hendelsene på valgt dag, nyest først. Dette er også rekkefølgen spilleren blar i.
-    private var hendelser: [Klipp] {
-        guard let kam = kamera else { return [] }
+    /// Regner ut hendelsene på valgt dag, nyest først. Kalles når dagen eller dataene
+    /// endrer seg — ikke under rulling.
+    private func oppdaterHendelser() {
+        guard let kam = kamera else { hendelser = []; return }
         let start = dag, slutt = dag.addingTimeInterval(86400)
-        return kam.deteksjonsklipp
+        hendelser = kam.deteksjonsklipp
             .filter { $0.start >= start && $0.start < slutt }
             .map { Klipp(kamera: kam.navn, iv: $0, alarm: kam.alarm(i: $0)) }
             .sorted { $0.iv.sUnix > $1.iv.sUnix }
@@ -72,9 +76,15 @@ struct KameraOpptak: View {
         VStack(spacing: 0) {
             spillerFelt
             datolinje
+            // Å slippe tidslinja VELGER bare. Ingenting starter av seg selv — det var
+            // nettopp autostarten som gjorde bladring stressende.
             Tidslinje(kamera: kamera, vindu: $vindu, hode: $hode, fri: fritt) { iv in
-                if fritt { friFra = hode; valgt = nil }
+                if fritt { friFra = hode; valgt = nil; spilles = nil }
                 else if let k = hendelser.first(where: { $0.iv.sUnix == iv.sUnix }) { velg(k) }
+            } påTrykk: {
+                // Trykk på tidslinja spiller det som er valgt.
+                if fritt, påDekningNå() { friFra = hode; spilles = nil }
+                else if let k = valgt { spill(k) }
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
@@ -99,7 +109,7 @@ struct KameraOpptak: View {
                   ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(hendelser) { k in
-                            Button { velg(k) } label: { rad(k) }
+                            Button { spill(k) } label: { rad(k) }
                                 .id(k.id)
                         }
                     }
@@ -110,26 +120,21 @@ struct KameraOpptak: View {
                 .scrollPosition(id: $øverst, anchor: .top)
                 // Vi må vite når fingeren faktisk slipper. iOS 17 har ingen
                 // scroll-fase-hendelse, så vi lytter på gesten ved siden av rullingen.
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { _ in fingerNede = true; byttOppgave?.cancel() }
-                        .onEnded { _ in fingerNede = false; planleggBytte() }
-                )
                 .onChange(of: øverst) { _, ny in
-                    // Rulling flytter BARE tidslinja, og UTEN animasjon. Å animere ved hver
-                    // rad som passerer — og enda verre, å bygge spilleren på nytt — gjorde
-                    // rullingen hakkete. Video byttes ved TRYKK; det er der man faktisk har
-                    // bestemt seg.
+                    // Rulling VELGER den øverste raden og flytter tidslinja dit — uten
+                    // animasjon og uten å røre spilleren. Ingen tunge utregninger her:
+                    // alt dette kjører for hver rad som passerer.
                     guard !ruller, let id = ny, let k = hendelser.first(where: { $0.id == id }) else { return }
+                    valgt = k
                     vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
                     hode = k.iv.start
                     forhåndshent(rundt: id)
                 }
                 .refreshable { await last() }
-                .onChange(of: påVei?.id) { _, ny in
-                    // Rull til klippet markøren står over, ellers ser man ikke hvor man
-                    // er på vei — den blå rammen kan like gjerne være utenfor skjermen.
-                    guard let ny else { return }
+                .onChange(of: valgt?.id) { _, ny in
+                    // Rull til den valgte, ellers kan den blå rammen ligge utenfor skjermen.
+                    // Bare når valget kom fra tidslinja — ikke når det kom fra rullingen selv.
+                    guard let ny, øverst != ny else { return }
                     ruller = true
                     withAnimation(.easeOut(duration: 0.2)) { rull.scrollTo(ny, anchor: .top) }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { ruller = false }
@@ -147,19 +152,31 @@ struct KameraOpptak: View {
             if fritt, let fra = friFra, let url = api.friOpptakURL(kamera: kameranavn, fra: fra) {
                 Spiller(url: url, markering: nil, lengde: 40)
                     .id("fri-\(Int(fra.timeIntervalSince1970))")
-            } else if let k = valgt, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
+            } else if let k = spilles, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
                 // IKKE tving 16:9 på hele feltet: kontrollbaren ligger inni Spiller, og da
                 // måtte bildet krympe for å gi plass — resultatet var svarte kanter på
                 // sidene. Spiller styrer selv bildets sideforhold.
                 Spiller(url: url, markering: k.markering, lengde: k.iv.lengde)
                     .id(k.id)   // ny spiller per klipp — ellers henger forrige igjen
             } else {
+                // Ingenting spiller ennå. Viser den valgte hendelsen som stillbilde med en
+                // avspillingsknapp oppå — så er det tydelig at noe venter på et trykk,
+                // framfor en evig ProgressView som ser ut som en feil.
                 ZStack {
                     RoundedRectangle(cornerRadius: 10).fill(.black)
-                    if hendelser.isEmpty {
-                        Text("Ingen opptak å vise").font(.footnote).foregroundStyle(Farge.svak)
+                    if let k = valgt {
+                        EnkeltRamme(api: api, klipp: k).opacity(0.55)
+                        Button { spill(k) } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: "play.circle.fill").font(.system(size: 46))
+                                Text(k.iv.start, format: .dateTime.hour().minute().second())
+                                    .font(.caption.monospacedDigit())
+                            }
+                            .foregroundStyle(.white.opacity(0.95))
+                        }
                     } else {
-                        ProgressView().tint(Farge.dempet)
+                        Text(hendelser.isEmpty ? "Ingen opptak å vise" : "Velg en hendelse")
+                            .font(.footnote).foregroundStyle(Farge.svak)
                     }
                 }
                 .aspectRatio(16.0 / 9.0, contentMode: .fit)
@@ -179,7 +196,7 @@ struct KameraOpptak: View {
                 }
         )
         .overlay(alignment: .topTrailing) {
-            if valgt != nil {
+            if spilles != nil {
                 Button { fullskjerm = true } label: {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.footnote)
@@ -195,7 +212,7 @@ struct KameraOpptak: View {
             if fritt, let fra = friFra, let url = api.friOpptakURL(kamera: kameranavn, fra: fra) {
                 Spiller(url: url, markering: nil, lengde: 40)
                     .id("fri-\(Int(fra.timeIntervalSince1970))")
-            } else if let k = valgt, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
+            } else if let k = spilles, let url = api.opptakURL(kamera: k.kamera, klipp: k.iv) {
                 ZStack {
                     Color.black.ignoresSafeArea()
                     Spiller(url: url, markering: k.markering, lengde: k.iv.lengde)
@@ -219,9 +236,10 @@ struct KameraOpptak: View {
 
     /// +1 = eldre hendelse (lista er nyest først), -1 = nyere.
     private func blaTil(_ retning: Int) {
-        guard let n = valgt, let i = hendelser.firstIndex(where: { $0.id == n.id }) else { return }
+        guard let n = spilles ?? valgt,
+              let i = hendelser.firstIndex(where: { $0.id == n.id }) else { return }
         let mål = i + retning
-        if hendelser.indices.contains(mål) { velg(hendelser[mål]) }
+        if hendelser.indices.contains(mål) { spill(hendelser[mål]) }
     }
 
     private var datolinje: some View {
@@ -274,8 +292,8 @@ struct KameraOpptak: View {
                 Spacer()
                 if nåværende(k) {
                     Text("spilles").font(.caption2).foregroundStyle(Farge.aksent)
-                } else if erPåVei(k) {
-                    Text("slipp for å spille").font(.caption2).foregroundStyle(Farge.kjol)
+                } else if erValgt(k) {
+                    Text("trykk for å spille").font(.caption2).foregroundStyle(Farge.kjol)
                 }
             }
             .padding(.horizontal, 2)
@@ -285,43 +303,43 @@ struct KameraOpptak: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(nåværende(k) ? Farge.aksent : (erPåVei(k) ? Farge.kjol : .clear),
+                .stroke(nåværende(k) ? Farge.aksent : (erValgt(k) ? Farge.kjol : .clear),
                         lineWidth: 2)
         )
     }
 
-    /// Hendelsen som spilles markeres — ellers mister man orienteringen når man blar.
-    private func nåværende(_ k: Klipp) -> Bool { valgt?.id == k.id }
+    /// ORANSJE: spilles nå.  BLÅ: valgt, venter på et trykk.
+    ///
+    /// Begge er rene id-sammenligninger. Før lette den ene av dem gjennom hele
+    /// hendelseslista for å finne nærmeste klipp — og den ble kalt for HVER synlige rad,
+    /// altså O(n²) per rullebilde. Det var hovedgrunnen til hakkingen.
+    private func nåværende(_ k: Klipp) -> Bool { spilles?.id == k.id }
+    private func erValgt(_ k: Klipp) -> Bool { valgt?.id == k.id && spilles?.id != k.id }
 
-    /// Klippet markøren står over akkurat nå — altså der du lander hvis du slipper.
-    /// Uten dette må man slippe for å finne ut hvor man havnet.
-    private var påVei: Klipp? {
-        let u = hode.timeIntervalSince1970
-        return hendelser.min {
-            abs($0.iv.sUnix - u) < abs($1.iv.sUnix - u)
-        }.flatMap { abs($0.iv.sUnix - u) <= 300 ? $0 : nil }
-    }
-    private func erPåVei(_ k: Klipp) -> Bool { påVei?.id == k.id && !nåværende(k) }
-
-    /// Bytter til den ventende hendelsen når rullingen har roet seg etter at fingeren slapp.
-    /// Pausen dekker treghetsrullingen — uten den ville videoen byttet midt i utglidningen.
-    private func planleggBytte() {
-        byttOppgave?.cancel()
-        byttOppgave = Task {
-            try? await Task.sleep(for: .milliseconds(400))
-            guard !Task.isCancelled, !fingerNede, let k = ventende else { return }
-            valgt = k
-        }
-    }
-
-    /// Bytter kilde i spilleren og flytter spillehodet dit, så tidslinja følger med.
+    /// Velger uten å spille — flytter markøren og sentrerer tidslinja.
     private func velg(_ k: Klipp) {
         valgt = k
         hode = k.iv.start
-        // Markøren står midt på tidslinja, så «gå hit» betyr å sentrere vinduet.
         withAnimation(.easeOut(duration: 0.25)) {
             vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
         }
+    }
+
+    /// Starter avspilling. Eneste vei inn i spilleren — ingenting starter av seg selv.
+    private func spill(_ k: Klipp) {
+        valgt = k
+        spilles = k
+        hode = k.iv.start
+        withAnimation(.easeOut(duration: 0.25)) {
+            vindu = .init(midt: k.iv.start, spenn: vindu.spenn)
+        }
+    }
+
+    /// Om tidspunktet spillehodet står på har kontinuerlig dekning (til fri spoling).
+    private func påDekningNå() -> Bool {
+        guard let kam = kamera else { return false }
+        let u = hode.timeIntervalSince1970
+        return kam.kontinuerlig.contains { u >= $0.sUnix && u <= $0.eUnix }
     }
 
     private var erIdag: Bool {
@@ -331,6 +349,8 @@ struct KameraOpptak: View {
     private func flyttDag(_ n: Int) {
         guard let ny = Calendar.current.date(byAdding: .day, value: n, to: dag) else { return }
         dag = ny
+        valgt = nil; spilles = nil
+        oppdaterHendelser()
         let midt = Calendar.current.isDate(ny, inSameDayAs: .now)
             ? Date.now
             : ny.addingTimeInterval(12 * 3600)
@@ -340,6 +360,7 @@ struct KameraOpptak: View {
 
     private func gåTilNå() {
         dag = Calendar.current.startOfDay(for: .now)
+        oppdaterHendelser()
         vindu = .init(midt: .now, spenn: vindu.spenn)
         hode = .now
     }
@@ -366,7 +387,9 @@ struct KameraOpptak: View {
         do {
             kameraer = try await api.tidslinje()
             feil = nil
-            // Start på nyeste hendelse — en tom spiller er ingen god førsteopplevelse.
+            oppdaterHendelser()
+            // Nyeste hendelse blir VALGT, ikke spilt. Appen skal ikke begynne å spille
+            // av seg selv når man åpner den.
             if valgt == nil, let første = hendelser.first {
                 velg(første)
                 forhåndshent(rundt: første.id)
