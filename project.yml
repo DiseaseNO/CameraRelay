@@ -60,6 +60,12 @@ targets:
         # som App Store krever — uten den avvises opplastingen.
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
+        Release:
+          # MÅ settes ved MANUELL signering. Standardverdien er «iOS Development», som
+          # ikke finnes lenger — vi signerer med distribusjonssertifikatet fra match.
+          # (Ved AUTOMATISK signering var denne linja tvert imot en konflikt. Forskjellen
+          # er hele poenget: automatisk gjetter, manuell krever at man er presis.)
+          CODE_SIGN_IDENTITY: "Apple Distribution"
         # Debug skal ALDRI signere. Automatisk signering løser opp signering for hele
         # prosjektet når Xcode åpner det — også konfigurasjoner vi ikke arkiverer. Debug
         # ba derfor om en «iOS App Development»-profil og lagde et nytt utviklings-

@@ -51,7 +51,9 @@ platform :ios do
     # -allowProvisioningUpdates er BEVISST borte — det er den som ba Apple om nye
     # sertifikater. Profilnavnet kommer fra match.
     profil = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING][APP_ID]
-    signering = "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='#{profil}'"
+    signering = "CODE_SIGN_STYLE=Manual " \
+                "CODE_SIGN_IDENTITY='Apple Distribution' " \
+                "PROVISIONING_PROFILE_SPECIFIER='#{profil}'"
 
     build_app(
       scheme: "CameraRelay",
