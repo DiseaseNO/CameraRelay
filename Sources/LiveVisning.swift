@@ -8,6 +8,9 @@ struct LiveVisning: View {
     @State private var kameraer: [KameraTL] = []
     @State private var feil: String?
     @State private var fullskjerm: String?
+    /// Bumpes ved dra-ned. Brukes som `.id` på kortene, så spillerne bygges helt på nytt —
+    /// å bare hente kameralista igjen hjelper ikke når det er STRØMMEN som har hengt seg.
+    @State private var generasjon = 0
 
     var body: some View {
         NavigationStack {
@@ -18,6 +21,7 @@ struct LiveVisning: View {
                         ForEach(kameraer, id: \.navn) { kam in
                             if let url = api.liveURL(kamera: kam.navn) {
                                 LiveKort(navn: kam.navn, url: url) { fullskjerm = kam.navn }
+                                    .id("\(kam.navn)-\(generasjon)")
                             }
                         }
                         if let feil {
@@ -26,7 +30,7 @@ struct LiveVisning: View {
                     }
                     .padding(12)
                 }
-                .refreshable { await last() }
+                .refreshable { generasjon += 1; await last() }
             }
             .navigationTitle("Live")
             .toolbarBackground(Farge.flate, for: .navigationBar)
@@ -58,6 +62,10 @@ struct LiveKort: View {
     var påFullskjerm: () -> Void
 
     @State private var spiller = AVPlayer()
+    @State private var sisteTid: Double = -1
+    @State private var stilleSiden = Date()
+    @State private var vakt: Timer?
+    @State private var stopp = false
     @State private var zoom: CGFloat = 1
     @State private var skyv: CGSize = .zero
     @State private var zoomVedStart: CGFloat = 1
@@ -93,13 +101,44 @@ struct LiveKort: View {
             .background(.black)
         }
         .kort()
-        .onAppear {
-            // Autospill: en kameraliste skal vise bilde, ikke en play-knapp.
-            if spiller.currentItem == nil { spiller.replaceCurrentItem(with: AVPlayerItem(url: url)) }
-            spiller.isMuted = true      // lyd på i lista ville vært påtrengende
-            spiller.play()
+        .overlay(alignment: .center) {
+            if stopp {
+                VStack(spacing: 6) {
+                    ProgressView().tint(.white)
+                    Text("kobler til igjen …").font(.caption2).foregroundStyle(.white.opacity(0.8))
+                }
+            }
         }
-        .onDisappear { spiller.pause() }
+        .onAppear { start(); startVakt() }
+        .onDisappear { vakt?.invalidate(); vakt = nil; spiller.pause() }
+    }
+
+    private func start() {
+        spiller.replaceCurrentItem(with: AVPlayerItem(url: url))
+        spiller.isMuted = true      // lyd på i lista ville vært påtrengende
+        spiller.play()
+        sisteTid = -1
+        stilleSiden = Date()
+        stopp = false
+    }
+
+    /// Vaktbikkje. AVPlayer stopper STILLE når strømmen ryker — recorderen bytter temp-fil
+    /// ved ny sesjon, og da fryser bildet eller blir svart uten at det kommer en feil.
+    /// Står avspillingen i ro i 12 s, bygger vi strømmen opp igjen.
+    private func startVakt() {
+        vakt?.invalidate()
+        vakt = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+            let nå = spiller.currentTime().seconds
+            let gikkFramover = nå.isFinite && nå > sisteTid + 0.2
+            if gikkFramover {
+                sisteTid = nå
+                stilleSiden = Date()
+                if stopp { stopp = false }
+            } else if Date().timeIntervalSince(stilleSiden) > 12 {
+                stopp = true
+                start()
+            }
+        }
     }
 
     private func gester(_ ramme: CGSize) -> some Gesture {
