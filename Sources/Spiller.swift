@@ -60,7 +60,7 @@ struct Spiller: View {
                     }
             }
             .aspectRatio(sideforhold, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
 
             bar
         }

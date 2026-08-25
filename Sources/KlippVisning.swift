@@ -182,7 +182,8 @@ struct KameraOpptak: View {
                 .aspectRatio(16.0 / 9.0, contentMode: .fit)
             }
         }
-        .padding(.horizontal, 10)
+        // Ingen sidemarg: bildet skal gå helt ut i kantene. Margen ga en svart ramme
+        // rundt videoen som så ut som letterboxing.
         .padding(.top, 6)
         // Sveip til neste/forrige hendelse uten å se ned i lista. Romslig terskel (70 pt),
         // for pinch-zoom i bildet bruker samme flate.
