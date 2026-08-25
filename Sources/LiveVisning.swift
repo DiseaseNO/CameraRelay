@@ -153,6 +153,10 @@ struct Fullskjerm: View {
     /// 4K må hentes fra recorderen og pakkes om før første bilde finnes. Uten en synlig
     /// venteindikator ser knappen ut som den ikke gjorde noe.
     @State private var laster4k = false
+    /// Hvorfor AVPlayer eventuelt forkastet strømmen. Den VET det — `errorLog()` gir
+    /// HTTP-kode og en kommentar — men sier ingenting av seg selv, og et svart bilde uten
+    /// forklaring er umulig å feilsøke på avstand.
+    @State private var feil4k: String?
     // Lyd AV til man ber om det. Å åpne fullskjerm skal ikke plutselig gi lyd i rommet.
     @State private var dempet = true
     @State private var dra: CGFloat = 0
@@ -247,6 +251,16 @@ struct Fullskjerm: View {
                 }
                 .padding()
                 Spacer()
+                if let feil4k {
+                    Text(feil4k)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.white)
+                        .padding(10)
+                        .background(.red.opacity(0.75))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .padding(.horizontal, 12).padding(.bottom, 24)
+                        .textSelection(.enabled)
+                }
             }
         }
         .onAppear { bytt() }
@@ -268,18 +282,37 @@ struct Fullskjerm: View {
         // Backend må starte RTSP-uttrekket og samle tre segmenter før AVPlayer kan begynne.
         // Det tar rundt seks sekunder, og uten dette flagget ser skjermen bare død ut.
         laster4k = firK
+        feil4k = nil
         let vare = AVPlayerItem(url: kilde)
         spiller.replaceCurrentItem(with: vare)
         spiller.isMuted = dempet
         spiller.play()
-        if firK {
-            Task {
-                for _ in 0..<40 {
-                    try? await Task.sleep(for: .milliseconds(400))
-                    if vare.status == .failed || spiller.currentTime().seconds > 0 { break }
-                }
-                laster4k = false
+        guard firK else { return }
+
+        Task {
+            for _ in 0..<40 {
+                try? await Task.sleep(for: .milliseconds(400))
+                if spiller.currentTime().seconds > 0 { laster4k = false; return }
+                if let m = avvisning(vare) { feil4k = m; laster4k = false; return }
             }
+            laster4k = false
+            feil4k = avvisning(vare) ?? "4K: ingen bilder på 16 s, ingen feil rapportert"
         }
+    }
+
+    /// Plukker ut hvorfor strømmen ble avvist. `status == .failed` dekker bare de groveste
+    /// tilfellene; når AVPlayer forkaster en HLS-variant — feil kodek-streng, uleselig
+    /// segment — havner grunnen i `errorLog()` mens status forblir `.unknown` og bildet
+    /// bare er svart.
+    private func avvisning(_ vare: AVPlayerItem) -> String? {
+        if vare.status == .failed {
+            return "4K feilet: " + (vare.error?.localizedDescription ?? "ukjent")
+        }
+        if let e = vare.errorLog()?.events.last {
+            let kode = e.errorStatusCode
+            let tekst = e.errorComment ?? e.errorDomain
+            return "4K avvist (\(kode)): \(tekst)"
+        }
+        return nil
     }
 }
