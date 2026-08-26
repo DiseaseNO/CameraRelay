@@ -82,3 +82,28 @@ transkoding, samme byte-ranges, ingen ekstra last på recorderen.
 | `GET /api/kamera/:navn/live.m3u8` | live (720p H.264) |
 | `GET /api/kamera/:navn/opptak.m3u8` | opptak (4K HEVC) |
 | `GET /api/kamera/:navn/bilde` | film-stripe per hendelse |
+
+## Versjonering — bump FØR hver TestFlight-opplasting
+
+**Regel: hver gang det pushes en ny endring til TestFlight, økes `MARKETING_VERSION` i
+`project.yml`.** Ett sted, én linje — `CFBundleShortVersionString` følger med automatisk.
+
+Størrelsen på endringen avgjør hvilket tall som økes:
+
+| Endring | Eksempel | Bump |
+|---|---|---|
+| Feilretting, justering av utseende | svarte kanter, hakkete rulling, feil farge | **patch** — 1.0.1 → 1.0.2 |
+| Ny funksjon, eller noe merkbart nytt i bruk | ny fane, live 4K, ny gest | **minor** — 1.0.2 → 1.1 |
+| Appen gjør noe vesentlig annet enn før | omlegging av navigasjon eller datamodell | **major** — 1.1 → 2.0 |
+
+Er du i tvil mellom to nivåer, velg det laveste. Det koster ingenting å bumpe ofte.
+
+**Byggnummeret skal du ALDRI røre.** `CFBundleVersion` settes fra `github.run_number` og
+stiger av seg selv. Apple krever bare at det er høyere enn forrige opplasting — det var
+derfor #82 kunne lastes opp rett etter at #55 traff opplastingsgrensa.
+
+Hvorfor dette er verdt bryet: TestFlight grupperer bygg under versjonen. Uten bumping havner
+alt under «1.0», og du kan ikke se hvilket bygg som inneholder hva. Med bumping ser du det
+i lista.
+
+Status: **1.0 = bygg 90** (26.08.2026). Neste opplasting skal ha nytt versjonsnummer.
