@@ -34,7 +34,9 @@ targets:
         # og siden vi genererer Info.plist selv ble CFBundleVersion aldri satt —
         # hver opplasting het «Build 1», som Apple avviser som duplikat.
         CFBundleVersion: ${BUILD_NUMBER}
-        CFBundleShortVersionString: "1.0"
+        # ÉN kilde: MARKETING_VERSION over. Sto hardkodet her også, og da ville en
+        # oppdatering ett sted gitt en app som oppgir to forskjellige versjoner.
+        CFBundleShortVersionString: ${MARKETING_VERSION}
         # Uten denne blir hvert bygg liggende som «Missing Compliance» i TestFlight og
         # kan ikke installeres før man svarer manuelt på eksportspørsmålet i App Store
         # Connect. Appen bruker bare HTTPS, altså standardkryptering — false er riktig.
