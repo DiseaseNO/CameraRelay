@@ -161,8 +161,13 @@ final class API {
     }
 
     /// Driftsstatus: tjenestene på serveren + recorderens ressursbruk.
+    ///
+    /// Stien ligger under `/api/kamera/` med vilje. Utenfra går appen gjennom
+    /// `frcr.gustavs1.no`, der FortiADC bare slipper gjennom `^/api/kamera/`,
+    /// `/api/enheter/par` og `/api/health` — alt annet dropper med **503**. Det var
+    /// nettopp det som skjedde da endepunktet het `/api/system/status`.
     func drift() async throws -> DriftSvar {
-        try await hent(DriftSvar.self, "/api/system/status")
+        try await hent(DriftSvar.self, "/api/kamera/drift")
     }
 
     // MARK: låsing
