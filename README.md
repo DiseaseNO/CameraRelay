@@ -106,6 +106,7 @@ Hvorfor dette er verdt bryet: TestFlight grupperer bygg under versjonen. Uten bu
 alt under «1.0», og du kan ikke se hvilket bygg som inneholder hva. Med bumping ser du det
 i lista.
 
-Status: **1.1.1 = bygg 98** (27.08.2026) — handlingene flyttet til nedtrekksmeny, og
-bekreftelse før opplåsing. (1.1 = bygg 95: nedlasting til kamerarull, låsing, fanen
+Status: **1.2 = bygg 101** (27.08.2026) — driftsstatus i Innstillinger: tjenestene på
+serveren og recorderens cpu/minne/disk. (1.1.1 = bygg 98: handlinger i nedtrekksmeny +
+bekreftelse før opplåsing. 1.1 = bygg 95: nedlasting til kamerarull, låsing, fanen
 «Låste».) Neste opplasting skal ha nytt versjonsnummer.
