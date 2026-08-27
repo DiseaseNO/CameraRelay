@@ -309,13 +309,26 @@ struct KameraOpptak: View {
                     .clipShape(RoundedRectangle(cornerRadius: 3))
                     .padding(4)
             }
+            // Låsemerket ligger PÅ stripa, i samme form som varigheten. Et lite ikon nede
+            // i metadata-linja ble borte i mengden — og et låst klipp er nettopp det man
+            // skal kunne se på et halvt blikk mens man blar.
+            .overlay(alignment: .topTrailing) {
+                if erLåst(k) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
+                        Text("Låst").font(.system(size: 10, weight: .semibold))
+                    }
+                    .padding(.horizontal, 5).padding(.vertical, 2)
+                    .background(.black.opacity(0.75))
+                    .foregroundStyle(Farge.aksent)
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                    .padding(4)
+                }
+            }
             HStack(spacing: 8) {
                 Image(systemName: "figure.walk").font(.caption2).foregroundStyle(Farge.aksent)
                 Text(k.iv.start, format: .dateTime.hour().minute().second())
                     .font(.subheadline.monospacedDigit()).foregroundStyle(Farge.tekst)
-                if erLåst(k) {
-                    Image(systemName: "lock.fill").font(.caption2).foregroundStyle(Farge.aksent)
-                }
                 Spacer()
                 if nåværende(k) {
                     Text("spilles").font(.caption2).foregroundStyle(Farge.aksent)
