@@ -106,4 +106,5 @@ Hvorfor dette er verdt bryet: TestFlight grupperer bygg under versjonen. Uten bu
 alt under «1.0», og du kan ikke se hvilket bygg som inneholder hva. Med bumping ser du det
 i lista.
 
-Status: **1.0 = bygg 90** (26.08.2026). Neste opplasting skal ha nytt versjonsnummer.
+Status: **1.1 = bygg 95** (27.08.2026) — nedlasting til kamerarull, låsing av klipp og
+fanen «Låste». Neste opplasting skal ha nytt versjonsnummer.
