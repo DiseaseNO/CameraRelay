@@ -39,6 +39,23 @@ struct KameraTL: Decodable, Hashable {
 /// med samme navn ville kollidert.
 struct TidslinjeSvar: Decodable { let kameraer: [KameraTL] }
 
+/// Et LÅST opptak, slik recorderen selv rapporterer det (`/api/kamera/laste`).
+///
+/// Grensene her er recorderens egne, og de kan avvike litt fra dem vi har lagret —
+/// recorderen justerer et deteksjonsklipp mens bevegelsen pågår. Derfor sammenlignes
+/// låste klipp med OVERLAPP, ikke med likhet.
+struct LåstKlipp: Decodable, Hashable, Identifiable {
+    let navn: String, sub: Int
+    let s: String, e: String
+    let sUnix: Double, eUnix: Double
+    var id: String { "\(navn)-\(Int(sUnix))" }
+    var intervall: Intervall { Intervall(s: s, e: e, sUnix: sUnix, eUnix: eUnix) }
+    var start: Date { Date(timeIntervalSince1970: sUnix) }
+    var lengde: TimeInterval { max(0, eUnix - sUnix) }
+}
+private struct LåsteSvar: Decodable { let klipp: [LåstKlipp] }
+private struct LåsSvar: Decodable { let laast: Bool }
+
 struct ParSvar: Decodable {
     let token: String
     struct Enhet: Decodable { let id: String; let navn: String }
@@ -112,6 +129,60 @@ final class API {
         try await hent(TidslinjeSvar.self, "/api/kamera/tidslinje").kameraer
     }
 
+    // MARK: låsing
+
+    /// Alle låste opptak, nyest først. Recorderen filtrerer selv, så dette er ETT kall —
+    /// vi spør aldri om låsestatus per klipp mens man blar (det ville fått recorderen til
+    /// å generere et klipp for hver rad man rullet forbi).
+    func låsteKlipp() async throws -> [LåstKlipp] {
+        try await hent(LåsteSvar.self, "/api/kamera/laste", ["dager": "365"]).klipp
+    }
+
+    /// Låser eller låser opp et klipp. Låste opptak overlever recorderens opprydding
+    /// når disken går full — det er hele poenget med knappen.
+    @discardableResult
+    func settLås(kamera: String, klipp: Intervall, sub: Int = 2, lås: Bool) async throws -> Bool {
+        try await send(LåsSvar.self, "/api/kamera/\(kod(kamera))/las",
+                       ["s": klipp.s, "e": klipp.e, "sub": String(sub), "las": lås ? "1" : "0"]).laast
+    }
+
+    // MARK: nedlasting
+
+    /// Laster klippet ned til en midlertidig fil og gir tilbake stien.
+    ///
+    /// Backend pakker om til vanlig progressiv MP4 med `hvc1`-tag; recorderens egen fil er
+    /// fragmentert og tagget `hev1`, som verken Fotos eller AVFoundation vil ha.
+    /// `download` skriver rett til disk — et 4K-klipp er titalls MB og har ingenting i
+    /// minnet å gjøre.
+    func lastNedKlipp(kamera: String, klipp: Intervall, sub: Int = 2) async throws -> URL {
+        guard let u = adresse("/api/kamera/\(kod(kamera))/nedlasting.mp4",
+                              ["s": klipp.s, "e": klipp.e, "sub": String(sub)]) else { throw APIFeil.ingenServer }
+        var rq = URLRequest(url: u)
+        rq.setValue("Bearer \(token ?? "")", forHTTPHeaderField: "Authorization")
+        rq.timeoutInterval = 180
+        let (fil, svar) = try await URLSession.shared.download(for: rq)
+        guard let h = svar as? HTTPURLResponse else { throw APIFeil.nettverk("Uventet svar") }
+        if h.statusCode == 401 { throw APIFeil.ikkeAutorisert }
+        guard h.statusCode == 200 else { throw APIFeil.kode(h.statusCode) }
+        // URLSession gir fila et navn uten etternavn. Fotos leser typen fra endelsen, så
+        // uten «.mp4» blir importen avvist.
+        let mål = FileManager.default.temporaryDirectory
+            .appendingPathComponent(navnFra(h) ?? "\(kamera)-\(Int(klipp.sUnix)).mp4")
+        try? FileManager.default.removeItem(at: mål)
+        try FileManager.default.moveItem(at: fil, to: mål)
+        return mål
+    }
+
+    /// Filnavnet backend foreslår i Content-Disposition («Gate-2026-08-27-21_50_05.mp4»).
+    private func navnFra(_ h: HTTPURLResponse) -> String? {
+        guard let cd = h.value(forHTTPHeaderField: "Content-Disposition"),
+              let m = cd.range(of: "filename=\"") else { return nil }
+        let rest = cd[m.upperBound...]
+        guard let slutt = rest.firstIndex(of: "\"") else { return nil }
+        let navn = String(rest[..<slutt])
+        return navn.contains("/") || navn.isEmpty ? nil : navn
+    }
+
     /// Film-stripa recorderen lager per hendelse: fire rammer i én JPEG (~1456x200).
     /// Vises i sin helhet — beskjæres den til 16:9 ser man bare en stripe av hendelsen.
     func stripeURL(kamera: String, alarmUnix: Double) -> URL? {
@@ -163,11 +234,29 @@ final class API {
         s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
     }
 
-    private func hent<T: Decodable>(_ type: T.Type, _ sti: String) async throws -> T {
-        guard let vert, let token, let u = URL(string: grunnadresse(vert) + sti) else { throw APIFeil.ingenServer }
+    /// Adresse UTEN token i spørrestrengen — til kall som kan sette Authorization-header
+    /// selv. Bare medie-URL-ene (`url`) trenger tokenet i klartekst.
+    private func adresse(_ sti: String, _ q: [String: String] = [:]) -> URL? {
+        guard let vert else { return nil }
+        var c = URLComponents(string: grunnadresse(vert)) ?? URLComponents()
+        c.percentEncodedPath = sti
+        if !q.isEmpty { c.queryItems = q.map { URLQueryItem(name: $0.key, value: $0.value) } }
+        return c.url
+    }
+
+    private func hent<T: Decodable>(_ type: T.Type, _ sti: String, _ q: [String: String] = [:]) async throws -> T {
+        try await kall(type, sti, q, metode: "GET")
+    }
+    private func send<T: Decodable>(_ type: T.Type, _ sti: String, _ q: [String: String] = [:]) async throws -> T {
+        try await kall(type, sti, q, metode: "POST")
+    }
+
+    private func kall<T: Decodable>(_ type: T.Type, _ sti: String, _ q: [String: String], metode: String) async throws -> T {
+        guard let token, let u = adresse(sti, q) else { throw APIFeil.ingenServer }
         var rq = URLRequest(url: u)
+        rq.httpMethod = metode
         rq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        rq.timeoutInterval = 30
+        rq.timeoutInterval = 60
         let (data, svar) = try await URLSession.shared.data(for: rq)
         guard let h = svar as? HTTPURLResponse else { throw APIFeil.nettverk("Uventet svar") }
         if h.statusCode == 401 { throw APIFeil.ikkeAutorisert }

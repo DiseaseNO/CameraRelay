@@ -38,8 +38,19 @@ struct KameraOpptak: View {
     @State private var friFra: Date?
     @State private var feil: String?
     @State private var laster = true
+    /// Låste klipp for dette kameraet. Hentes med ETT kall når visningen åpnes — ikke per
+    /// rad. Å slå opp låsestatus for ett klipp får recorderen til å generere klippet, så
+    /// et oppslag per rad man blar forbi ville lagt den ned.
+    @State private var låste: [LåstKlipp] = []
 
     private var kamera: KameraTL? { kameraer.first { $0.navn == kameranavn } }
+
+    /// Recorderen justerer grensene på et deteksjonsklipp mens bevegelsen pågår, så det
+    /// låste klippet kan ha litt andre tider enn dem vi har lagret. Vi sammenligner derfor
+    /// med OVERLAPP, ikke med likhet.
+    private func erLåst(_ k: Klipp) -> Bool {
+        låste.contains { $0.navn == k.kamera && $0.sUnix < k.iv.eUnix + 2 && $0.eUnix > k.iv.sUnix - 2 }
+    }
 
     /// Regner ut hendelsene på valgt dag, nyest først. Kalles når dagen eller dataene
     /// endrer seg — ikke under rulling.
@@ -77,6 +88,16 @@ struct KameraOpptak: View {
             // Spilleren har forrang på plassen. Uten dette gir VStacken den bare det som
             // blir til overs, og bildet krymper i bredden.
             spillerFelt.layoutPriority(1)
+            // Knappene hører til den hendelsen man ser på. Ligger de under spilleren, er
+            // det aldri tvil om HVILKET klipp man laster ned eller låser.
+            if let k = spilles ?? valgt {
+                Klippknapper(api: api, kamera: k.kamera, klipp: k.iv, låst: erLåst(k)) { nyLåst in
+                    if nyLåst { Task { await lastLåste() } }
+                    else { låste.removeAll { $0.navn == k.kamera && $0.sUnix < k.iv.eUnix + 2 && $0.eUnix > k.iv.sUnix - 2 } }
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+            }
             datolinje
             // Å slippe tidslinja VELGER bare. Ingenting starter av seg selv — det var
             // nettopp autostarten som gjorde bladring stressende.
@@ -292,6 +313,9 @@ struct KameraOpptak: View {
                 Image(systemName: "figure.walk").font(.caption2).foregroundStyle(Farge.aksent)
                 Text(k.iv.start, format: .dateTime.hour().minute().second())
                     .font(.subheadline.monospacedDigit()).foregroundStyle(Farge.tekst)
+                if erLåst(k) {
+                    Image(systemName: "lock.fill").font(.caption2).foregroundStyle(Farge.aksent)
+                }
                 Spacer()
                 if nåværende(k) {
                     Text("spilles").font(.caption2).foregroundStyle(Farge.aksent)
@@ -384,9 +408,16 @@ struct KameraOpptak: View {
         return String(format: "%d:%02d", d / 60, d % 60)
     }
 
+    /// Låste klipp for DETTE kameraet. Feiler kallet, viser vi bare ingen hengelåser —
+    /// det er bedre enn å blokkere hele opptaksvisningen for en pynt-detalj.
+    private func lastLåste() async {
+        låste = ((try? await api.låsteKlipp()) ?? []).filter { $0.navn == kameranavn }
+    }
+
     private func last() async {
         laster = kameraer.isEmpty
         defer { laster = false }
+        await lastLåste()
         do {
             kameraer = try await api.tidslinje()
             feil = nil

@@ -69,8 +69,10 @@ struct Hovedvisning: View {
                 .tabItem { Label("Live", systemImage: "video") }.tag(0)
             Kameraliste(api: api)
                 .tabItem { Label("Opptak", systemImage: "clock.arrow.circlepath") }.tag(1)
+            LåsteVisning(api: api)
+                .tabItem { Label("Låste", systemImage: "lock.fill") }.tag(2)
             Innstillinger(api: api)
-                .tabItem { Label("Innstillinger", systemImage: "gearshape") }.tag(2)
+                .tabItem { Label("Innstillinger", systemImage: "gearshape") }.tag(3)
         }
     }
 }

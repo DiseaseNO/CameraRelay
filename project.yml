@@ -9,7 +9,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    MARKETING_VERSION: "1.0"
+    MARKETING_VERSION: "1.1"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.9"
     # Settes fra miljøet ved `xcodegen generate` — ikke hardkodet, så andre kan bygge
@@ -41,6 +41,11 @@ targets:
         # kan ikke installeres før man svarer manuelt på eksportspørsmålet i App Store
         # Connect. Appen bruker bare HTTPS, altså standardkryptering — false er riktig.
         ITSAppUsesNonExemptEncryption: false
+        # Nedlastingsknappen legger klippet i kamerarullen. Uten denne teksten krasjer
+        # appen i det øyeblikket den ber om tilgang — iOS avslutter prosessen med vilje
+        # når en tillatelse mangler forklaring.
+        NSPhotoLibraryAddUsageDescription: >-
+          Brukes til å lagre kameraklipp i kamerarullen når du trykker «Last ned».
         UIUserInterfaceStyle: Dark
         UILaunchScreen: {}
         # ALLE FIRE må med. Appen bygges som universal (iPhone + iPad), og App Store
