@@ -54,6 +54,37 @@ struct LåstKlipp: Decodable, Hashable, Identifiable {
     var lengde: TimeInterval { max(0, eUnix - sUnix) }
 }
 private struct LåsteSvar: Decodable { let klipp: [LåstKlipp] }
+
+// MARK: driftsstatus
+
+/// En systemd-tjeneste på serveren (CT 115).
+struct TjenesteStatus: Decodable, Identifiable, Hashable {
+    let navn: String, unit: String, hva: String
+    let aktiv: Bool, tilstand: String
+    let oppeSek: Double, minneMB: Int
+    var id: String { unit }
+}
+/// Recorderens ressursbruk. Ikke sanntid — backend cacher i et minutt, for hvert
+/// oppslag koster recorderen noe.
+struct RecorderStatus: Decodable, Hashable {
+    struct Disk: Decodable, Hashable { let brukt: Double; let total: Double; let prosent: Double }
+    struct Logg: Decodable, Hashable { let prosent: Double }
+    let cpu: Double, minne: Double, last: Double
+    let sesjoner: Int
+    let videodisk: Disk
+    let loggdisk: Logg
+    let oppetid: String, firmware: String, serienummer: String
+    /// Recorderens EGET anslag for hvor lenge til videodisken er full (sekunder).
+    let estimertLagring: Double
+    /// Hvor langt tilbake den faktisk har opptak nå (sekunder).
+    let faktiskLagring: Double
+}
+struct DriftSvar: Decodable {
+    let tjenester: [TjenesteStatus]
+    let recorder: RecorderStatus?
+    let recorderFeil: String?
+    let tid: Double
+}
 private struct LåsSvar: Decodable { let laast: Bool }
 
 struct ParSvar: Decodable {
@@ -127,6 +158,11 @@ final class API {
 
     func tidslinje() async throws -> [KameraTL] {
         try await hent(TidslinjeSvar.self, "/api/kamera/tidslinje").kameraer
+    }
+
+    /// Driftsstatus: tjenestene på serveren + recorderens ressursbruk.
+    func drift() async throws -> DriftSvar {
+        try await hent(DriftSvar.self, "/api/system/status")
     }
 
     // MARK: låsing

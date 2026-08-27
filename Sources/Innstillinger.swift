@@ -28,6 +28,9 @@ struct Innstillinger: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         felt("Server", api.vert ?? "—")
+                        // Drift øverst: når man først åpner Innstillinger fordi noe er
+                        // rart, er «kjører tjenestene?» det første man vil vite.
+                        Drift(api: api)
                         statistikk
                         feilsøking
                         omApp
