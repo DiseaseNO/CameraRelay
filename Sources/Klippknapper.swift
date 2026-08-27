@@ -21,6 +21,7 @@ struct Klippknapper: View {
     @State private var nedlaster = Nedlaster()
     @State private var låser = false
     @State private var låsefeil: String?
+    @State private var bekreftOpplås = false
 
     var body: some View {
         VStack(spacing: 6) {
@@ -35,7 +36,10 @@ struct Klippknapper: View {
                       ikon: låst ? "lock.fill" : "lock.open",
                       aktiv: låst,
                       opptatt: låser) {
-                    Task { await vekslLås() }
+                    // Å låse er ufarlig. Å låse OPP er den ene handlingen her som kan
+                    // ende med at opptaket forsvinner ved neste opprydding, så den skal
+                    // ikke kunne skje med et uhell-trykk.
+                    if låst { bekreftOpplås = true } else { Task { await settLås(true) } }
                 }
             }
             if let m = låsefeil ?? nedlaster.melding {
@@ -45,6 +49,12 @@ struct Klippknapper: View {
                     .multilineTextAlignment(.center)
                     .transition(.opacity)
             }
+        }
+        .confirmationDialog("Lås opp klippet?", isPresented: $bekreftOpplås, titleVisibility: .visible) {
+            Button("Lås opp", role: .destructive) { Task { await settLås(false) } }
+            Button("Avbryt", role: .cancel) { }
+        } message: {
+            Text("Da kan opptaket bli slettet når disken går full.")
         }
         .animation(.easeOut(duration: 0.2), value: nedlaster.tilstand)
         .onChange(of: klipp.sUnix) { _, _ in nedlaster.nullstill(); låsefeil = nil }
@@ -61,13 +71,13 @@ struct Klippknapper: View {
 
     private func erFeil(_ m: String) -> Bool { m != "Lagret i kamerarullen" }
 
-    private func vekslLås() async {
+    private func settLås(_ lås: Bool) async {
         guard !låser else { return }
         låser = true
         låsefeil = nil
         defer { låser = false }
         do {
-            let ny = try await api.settLås(kamera: kamera, klipp: klipp, sub: sub, lås: !låst)
+            let ny = try await api.settLås(kamera: kamera, klipp: klipp, sub: sub, lås: lås)
             påLåsEndret(ny)
         } catch {
             if !erAvbrutt(error) { låsefeil = error.localizedDescription }

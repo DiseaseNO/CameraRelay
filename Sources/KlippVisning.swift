@@ -42,6 +42,15 @@ struct KameraOpptak: View {
     /// rad. Å slå opp låsestatus for ett klipp får recorderen til å generere klippet, så
     /// et oppslag per rad man blar forbi ville lagt den ned.
     @State private var låste: [LåstKlipp] = []
+    /// Nedlasting og låsing bor i menyen øverst til høyre, ikke som knapper i kolonnen.
+    /// Knappene tok høyde fra hendelseslista, og på videoflaten ville de kommet i veien
+    /// for zoomen. Tittellinja hadde ingenting på høyre side fra før.
+    @State private var nedlaster = Nedlaster()
+    @State private var låser = false
+    @State private var låsefeil: String?
+    /// Klippet som venter på «ja, lås opp». Å låse opp uten å mene det er den ene
+    /// handlingen her som kan miste et opptak for godt.
+    @State private var bekreftOpplås: Klipp?
 
     private var kamera: KameraTL? { kameraer.first { $0.navn == kameranavn } }
 
@@ -80,7 +89,97 @@ struct KameraOpptak: View {
         .navigationTitle(kameranavn)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Farge.flate, for: .navigationBar)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { klippmeny } }
+        .confirmationDialog("Lås opp klippet?",
+                            isPresented: .init(get: { bekreftOpplås != nil },
+                                               set: { if !$0 { bekreftOpplås = nil } }),
+                            titleVisibility: .visible) {
+            Button("Lås opp", role: .destructive) {
+                if let k = bekreftOpplås { Task { await settLås(k, lås: false) } }
+                bekreftOpplås = nil
+            }
+            Button("Avbryt", role: .cancel) { bekreftOpplås = nil }
+        } message: {
+            Text("Da kan opptaket bli slettet når disken går full.")
+        }
         .task { await last() }
+    }
+
+    /// Handlingene for klippet man ser på. Meny framfor knapper: ingen fast plass, og
+    /// videoflaten holdes ren så pinch-zoom har hele bildet for seg selv.
+    private var klippmeny: some View {
+        Menu {
+            if let k = spilles ?? valgt {
+                Section(klokkeslett(k)) {
+                    Button {
+                        Task { await nedlaster.lastNed(api: api, kamera: k.kamera, klipp: k.iv) }
+                    } label: { Label("Last ned til kamerarull", systemImage: "arrow.down.to.line") }
+
+                    if erLåst(k) {
+                        Button(role: .destructive) { bekreftOpplås = k } label: {
+                            Label("Lås opp", systemImage: "lock.open")
+                        }
+                    } else {
+                        Button { Task { await settLås(k, lås: true) } } label: {
+                            Label("Lås mot sletting", systemImage: "lock")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .disabled((spilles ?? valgt) == nil || nedlaster.laster || låser)
+    }
+
+    private func klokkeslett(_ k: Klipp) -> String {
+        k.iv.start.formatted(.dateTime.hour().minute().second())
+    }
+
+    private func settLås(_ k: Klipp, lås: Bool) async {
+        guard !låser else { return }
+        låser = true
+        låsefeil = nil
+        defer { låser = false }
+        do {
+            _ = try await api.settLås(kamera: k.kamera, klipp: k.iv, lås: lås)
+            await lastLåste()
+        } catch {
+            if !erAvbrutt(error) { låsefeil = error.localizedDescription }
+        }
+    }
+
+    /// Kort tilbakemelding som legger seg OPPÅ bildet. Den tar ingen plass i kolonnen og
+    /// slipper trykk gjennom, så den kommer verken i veien for lista eller for zoomen.
+    private var statusmerke: some View {
+        Group {
+            if let (tekst, erFeil) = status {
+                HStack(spacing: 6) {
+                    if nedlaster.laster || låser {
+                        ProgressView().controlSize(.mini).tint(.white)
+                    } else {
+                        Image(systemName: erFeil ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                            .font(.caption2)
+                    }
+                    Text(tekst).font(.caption2.weight(.medium))
+                }
+                .padding(.horizontal, 9).padding(.vertical, 5)
+                .background(.black.opacity(0.75))
+                .foregroundStyle(erFeil ? Farge.avvik : .white)
+                .clipShape(Capsule())
+                .padding(10)
+                .transition(.opacity)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var status: (String, Bool)? {
+        if nedlaster.laster { return ("Laster ned…", false) }
+        if låser { return ("Oppdaterer lås…", false) }
+        if let m = låsefeil { return (m, true) }
+        if let m = nedlaster.melding { return (m, m != "Lagret i kamerarullen") }
+        return nil
     }
 
     private var innhold: some View {
@@ -88,16 +187,6 @@ struct KameraOpptak: View {
             // Spilleren har forrang på plassen. Uten dette gir VStacken den bare det som
             // blir til overs, og bildet krymper i bredden.
             spillerFelt.layoutPriority(1)
-            // Knappene hører til den hendelsen man ser på. Ligger de under spilleren, er
-            // det aldri tvil om HVILKET klipp man laster ned eller låser.
-            if let k = spilles ?? valgt {
-                Klippknapper(api: api, kamera: k.kamera, klipp: k.iv, låst: erLåst(k)) { nyLåst in
-                    if nyLåst { Task { await lastLåste() } }
-                    else { låste.removeAll { $0.navn == k.kamera && $0.sUnix < k.iv.eUnix + 2 && $0.eUnix > k.iv.sUnix - 2 } }
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
-            }
             datolinje
             // Å slippe tidslinja VELGER bare. Ingenting starter av seg selv — det var
             // nettopp autostarten som gjorde bladring stressende.
@@ -219,6 +308,18 @@ struct KameraOpptak: View {
                     blaTil(g.translation.width < 0 ? 1 : -1)
                 }
         )
+        .overlay(alignment: .topLeading) { statusmerke }
+        .animation(.easeOut(duration: 0.2), value: nedlaster.tilstand)
+        .onChange(of: valgt?.id) { _, _ in nedlaster.nullstill(); låsefeil = nil }
+        // Kvitteringen skal si fra og så forsvinne — ikke bli stående som noe man må
+        // gjøre noe med.
+        .onChange(of: nedlaster.tilstand) { _, ny in
+            guard ny == .ferdig else { return }
+            Task {
+                try? await Task.sleep(for: .seconds(4))
+                if nedlaster.tilstand == .ferdig { nedlaster.nullstill() }
+            }
+        }
         .overlay(alignment: .topTrailing) {
             if spilles != nil {
                 Button { fullskjerm = true } label: {
