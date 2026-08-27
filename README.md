@@ -106,7 +106,13 @@ Hvorfor dette er verdt bryet: TestFlight grupperer bygg under versjonen. Uten bu
 alt under «1.0», og du kan ikke se hvilket bygg som inneholder hva. Med bumping ser du det
 i lista.
 
-Status: **1.2 = bygg 101** (27.08.2026) — driftsstatus i Innstillinger: tjenestene på
-serveren og recorderens cpu/minne/disk. (1.1.1 = bygg 98: handlinger i nedtrekksmeny +
-bekreftelse før opplåsing. 1.1 = bygg 95: nedlasting til kamerarull, låsing, fanen
-«Låste».) Neste opplasting skal ha nytt versjonsnummer.
+Status: **1.2.1 = bygg 104** (27.08.2026) — driftsstatus flyttet til `/api/kamera/drift`;
+den gamle stien ble droppet med 503 av FortiADC utenfra. (1.2 = bygg 101: driftsstatus.
+1.1.1 = bygg 98: handlinger i nedtrekksmeny + bekreftelse før opplåsing. 1.1 = bygg 95:
+nedlasting til kamerarull, låsing, fanen «Låste».) Neste opplasting skal ha nytt
+versjonsnummer.
+
+> **Nye API-stier appen bruker må ligge under `/api/kamera/`.** Utenfra går appen via
+> `frcr.gustavs1.no`, der FortiADC bare slipper gjennom `^/api/kamera/`, `/api/enheter/par`
+> og `/api/health`. Alt annet dropper med 503 — og feilen viser seg BARE utenfor
+> hjemmenettet, aldri under intern testing. Se `smarthus/deploy/README.md`.
