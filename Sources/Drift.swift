@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Driftsstatus: kjører tjenestene på serveren, og hvordan står det til med recorderen?
 ///
-/// Hensikten er å kunne svare på «virker det?» fra sofaen. Feilsøkingsdelen over svarer på
-/// om VEIEN fram er åpen; denne svarer på om det som skal kjøre i andre enden faktisk gjør
+/// Hensikten er å kunne svare på «virker det?» fra sofaen. Feilsøkingssida svarer på om
+/// VEIEN fram er åpen; denne svarer på om det som skal kjøre i andre enden faktisk gjør
 /// det, og om recorderen har plass igjen.
 ///
 /// Recordertallene er bevisst ikke sanntid. Backend cacher dem i et minutt, og visningen
@@ -34,7 +34,7 @@ struct Drift: View {
     // MARK: tjenester
 
     private var tjenesteboks: some View {
-        boks("Tjenester på serveren", oppdatert: data?.tid) {
+        Boks("Tjenester på serveren") {
             if let t = data?.tjenester, !t.isEmpty {
                 ForEach(t) { tj in
                     HStack(spacing: 8) {
@@ -44,6 +44,7 @@ struct Drift: View {
                             Text(tj.navn).font(.caption.weight(.medium)).foregroundStyle(Farge.tekst)
                             Text(tj.aktiv ? tj.hva : tj.tilstand)
                                 .font(.caption2).foregroundStyle(tj.aktiv ? Farge.svak : Farge.avvik)
+                                .lineLimit(1)
                         }
                         Spacer()
                         VStack(alignment: .trailing, spacing: 1) {
@@ -61,24 +62,30 @@ struct Drift: View {
             } else {
                 Text("Henter …").font(.caption2).foregroundStyle(Farge.svak)
             }
+        } tilbehør: {
+            Button { Task { await last() } } label: {
+                Image(systemName: "arrow.clockwise").font(.caption2)
+                    .foregroundStyle(henter ? Farge.svak : Farge.aksent)
+            }
+            .disabled(henter)
         }
     }
 
     // MARK: recorder
 
     private var recorderboks: some View {
-        boks("Recorder", oppdatert: nil) {
+        Boks("Recorder") {
             if let r = data?.recorder {
                 stolpe("CPU", verdi: r.cpu, tekst: "\(Int(r.cpu)) %")
                 stolpe("Minne", verdi: r.minne, tekst: "\(Int(r.minne)) %")
                 stolpe("Videodisk", verdi: r.videodisk.prosent,
                        tekst: "\(gb(r.videodisk.brukt)) av \(gb(r.videodisk.total))")
                 Divider().overlay(Farge.strek).padding(.vertical, 2)
-                rad("Plass igjen til", plassIgjen(r))
-                rad("Opptak tilbake til", varighet(r.faktiskLagring) + " siden")
-                rad("Oppetid", recorderOppetid(r.oppetid))
-                rad("Aktive økter", "\(r.sesjoner)")
-                rad("Fastvare", r.firmware.replacingOccurrences(of: "(GA), ", with: " "))
+                Rad("Plass igjen til", plassIgjen(r))
+                Rad("Opptak tilbake til", varighet(r.faktiskLagring) + " siden")
+                Rad("Oppetid", recorderOppetid(r.oppetid))
+                Rad("Aktive økter", "\(r.sesjoner)")
+                Rad("Fastvare", kortFastvare(r.firmware))
             } else if let m = data?.recorderFeil ?? feil {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill").font(.caption2)
@@ -144,35 +151,12 @@ struct Drift: View {
         return String(format: "%.0f s", s)
     }
 
-    private func boks<Innhold: View>(_ tittel: String, oppdatert: Double?,
-                                     @ViewBuilder _ innhold: () -> Innhold) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(tittel).font(.footnote.weight(.semibold)).foregroundStyle(Farge.dempet)
-                Spacer()
-                if oppdatert != nil {
-                    Button { Task { await last() } } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.caption2)
-                            .foregroundStyle(henter ? Farge.svak : Farge.aksent)
-                    }
-                    .disabled(henter)
-                }
-            }
-            VStack(alignment: .leading, spacing: 8) { innhold() }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Farge.kort)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-        }
-    }
-
-    private func rad(_ venstre: String, _ høyre: String) -> some View {
-        HStack {
-            Text(venstre).font(.caption).foregroundStyle(Farge.dempet)
-            Spacer()
-            Text(høyre).font(.caption.monospacedDigit()).foregroundStyle(Farge.tekst)
-        }
+    /// «v7.6.0(GA), build382, 2026.06.26» er for langt for én linje. Byggnummeret er det
+    /// som identifiserer versjonen; datoen er støy her.
+    private func kortFastvare(_ s: String) -> String {
+        let d = s.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        guard d.count >= 2 else { return s }
+        return d[0].replacingOccurrences(of: "(GA)", with: "") + " " + d[1]
     }
 
     private func last() async {
