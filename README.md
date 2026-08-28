@@ -106,7 +106,9 @@ Hvorfor dette er verdt bryet: TestFlight grupperer bygg under versjonen. Uten bu
 alt under «1.0», og du kan ikke se hvilket bygg som inneholder hva. Med bumping ser du det
 i lista.
 
-Status: **1.3 = bygg 107** (28.08.2026) — Innstillinger ryddet til undermenyer.
+Status: **1.3.1 = bygg 111** (28.08.2026) — kameravelgeren viser ramme 3 av film-stripa
+(ramme 1 er 10 s før bevegelsen, altså tom med vilje) og henter bildet fra et klipp som er
+minst fem minutter gammelt. (1.3 = bygg 107: Innstillinger ryddet til undermenyer.)
 (1.2.1 = bygg 104: driftsstatus flyttet til `/api/kamera/drift`. 1.2 = bygg 101:
 driftsstatus. 1.1.1 = bygg 98: handlinger i nedtrekksmeny + bekreftelse før opplåsing.
 1.1 = bygg 95: nedlasting til kamerarull, låsing, fanen «Låste».) Neste opplasting skal
