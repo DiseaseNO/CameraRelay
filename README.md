@@ -106,11 +106,11 @@ Hvorfor dette er verdt bryet: TestFlight grupperer bygg under versjonen. Uten bu
 alt under «1.0», og du kan ikke se hvilket bygg som inneholder hva. Med bumping ser du det
 i lista.
 
-Status: **1.2.1 = bygg 104** (27.08.2026) — driftsstatus flyttet til `/api/kamera/drift`;
-den gamle stien ble droppet med 503 av FortiADC utenfra. (1.2 = bygg 101: driftsstatus.
-1.1.1 = bygg 98: handlinger i nedtrekksmeny + bekreftelse før opplåsing. 1.1 = bygg 95:
-nedlasting til kamerarull, låsing, fanen «Låste».) Neste opplasting skal ha nytt
-versjonsnummer.
+Status: **1.3 = bygg 107** (28.08.2026) — Innstillinger ryddet til undermenyer.
+(1.2.1 = bygg 104: driftsstatus flyttet til `/api/kamera/drift`. 1.2 = bygg 101:
+driftsstatus. 1.1.1 = bygg 98: handlinger i nedtrekksmeny + bekreftelse før opplåsing.
+1.1 = bygg 95: nedlasting til kamerarull, låsing, fanen «Låste».) Neste opplasting skal
+ha nytt versjonsnummer.
 
 > **Nye API-stier appen bruker må ligge under `/api/kamera/`.** Utenfra går appen via
 > `frcr.gustavs1.no`, der FortiADC bare slipper gjennom `^/api/kamera/`, `/api/enheter/par`
