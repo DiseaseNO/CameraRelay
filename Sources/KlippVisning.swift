@@ -668,17 +668,27 @@ struct Stripe: View {
 }
 
 /// Viser ÉN ramme av film-stripa, i full bredde. Stripa er fire rammer ved siden av
-/// hverandre; ved å skalere den fire ganger og klippe får vi den første alene — stor nok
-/// til å kjenne igjen stedet med én gang.
+/// hverandre; vi skalerer den fire ganger og klipper ut én.
+///
+/// **Ikke den første.** Klippet begynner 10 sekunder FØR bevegelsen (`alarm_pre` på
+/// kameraet), så ramme 1 er med vilje tatt før noe skjer: tom oppkjørsel om dagen, helt
+/// svart om natta før lyset slår på. Ramme 3 ligger midt i hendelsen, og er den som viser
+/// hva som faktisk skjedde. Hendelseslista viser hele stripa og merket derfor ingenting —
+/// det var bare kameravelgeren som så tom ut.
 struct EnkeltRamme: View {
     let api: API
     let klipp: Klipp
+    /// 0–3. Standard er tredje ramme; se forklaringen over.
+    var ramme: Int = 2
+
     var body: some View {
         GeometryReader { geo in
+            let b = geo.size.width
             Mellomlagret(url: api.stripeURL(kamera: klipp.kamera,
                                             alarmUnix: (klipp.alarm ?? klipp.iv).sUnix), fyll: true)
-                .frame(width: geo.size.width * 4, height: geo.size.height, alignment: .leading)
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .leading)
+                .frame(width: b * 4, height: geo.size.height, alignment: .leading)
+                .offset(x: -b * CGFloat(min(max(ramme, 0), 3)))
+                .frame(width: b, height: geo.size.height, alignment: .leading)
                 .clipped()
         }
         .aspectRatio(16.0 / 9.0, contentMode: .fit)
