@@ -601,17 +601,20 @@ struct Kameraliste: View {
     /// utvid-hint, og bildet i full bredde under. Thomas ville ha én velger-form begge
     /// steder, og likte live-varianten best.
     ///
-    /// Forskjellen som må være der: dette er et STILLBILDE av nyeste hendelse — en
-    /// opptaksvelger kan ikke spille live. Alt annet er likt.
+    /// Forskjellen som må være der: dette er et STILLBILDE — en opptaksvelger kan ikke
+    /// spille live. Alt annet er likt.
     private func rad(_ kam: KameraTL) -> some View {
-        let siste = kam.deteksjonsklipp.last
+        let nyeste = kam.deteksjonsklipp.last
+        let forside = velgerklipp(kam)
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Image(systemName: "figure.walk")
                     .font(.caption2).foregroundStyle(Farge.aksent)
                 Text(kam.navn).foregroundStyle(Farge.tekst).font(.subheadline.weight(.medium))
                 Spacer()
-                if let iv = siste {
+                // Teksten viser den EKTE nyeste hendelsen — det er informasjonen. Bildet
+                // under er et annet klipp, og skal ikke trekke tidspunktet med seg.
+                if let iv = nyeste {
                     HStack(spacing: 4) {
                         Text(iv.start, format: .dateTime.hour().minute())
                         Text("· \(kam.deteksjonsklipp.count)")
@@ -623,7 +626,7 @@ struct Kameraliste: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
 
-            if let iv = siste {
+            if let iv = forside {
                 EnkeltRamme(api: api, klipp: Klipp(kamera: kam.navn, iv: iv, alarm: kam.alarm(i: iv)))
             } else {
                 Rectangle().fill(Farge.kort2).aspectRatio(16.0 / 9.0, contentMode: .fit)
@@ -631,6 +634,26 @@ struct Kameraliste: View {
             }
         }
         .kort()
+    }
+
+    /// Hvor lenge et klipp må ha fått ligge før vi bruker det som forsidebilde.
+    /// Backend-polleren går hvert minutt og henter de nyeste miniatyrene først, så fem
+    /// minutter gir den flere runder å ta igjen på.
+    private static let modning: TimeInterval = 300
+
+    /// Klippet forsidebildet hentes fra.
+    ///
+    /// Bevisst IKKE det nyeste. Bildet skal bare vise hvilket kamera dette er, og det
+    /// nyeste klippet er nettopp det som kanskje ikke har fått miniatyr enda — da står
+    /// kortet tomt uten at noe er galt. Et klipp noen minutter tilbake er like godt til
+    /// gjenkjenning, har samme lysforhold, og er trygt hentet.
+    ///
+    /// Finnes ingen som er gamle nok (helt nytt kamera, eller arkivet er tomt), tar vi
+    /// det nyeste vi har framfor å vise ingenting.
+    private func velgerklipp(_ kam: KameraTL) -> Intervall? {
+        let klipp = kam.deteksjonsklipp                 // stigende, eldst først
+        let grense = Date().addingTimeInterval(-Self.modning)
+        return klipp.last { $0.slutt < grense } ?? klipp.last
     }
 
     private func last() async {
