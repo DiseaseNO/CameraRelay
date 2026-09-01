@@ -230,7 +230,7 @@ final class API {
 
     /// HLS. AVPlayer kan ikke MSE, så backend pakker den samme fMP4-strømmen som
     /// EXT-X-MAP + EXT-X-BYTERANGE. Ingen transkoding — samme byte-ranges som web-spilleren.
-    /// EKTE 4K live. Backend henter recorderens RTSP-strøm (3840x2160 HEVC) og pakker den
+    /// EKTE 4K live. Backend henter strømmen i full oppløsning (3840x2160 HEVC) og pakker den
     /// om til HLS uten å re-enkode. Live-relayen gir 720p fordi den ber recorderen
     /// transkode for nettleser; denne går utenom det.
     func live4kURL(kamera: String) -> URL? {

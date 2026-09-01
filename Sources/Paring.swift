@@ -21,7 +21,7 @@ struct Paring: View {
 
                 // Ingen ekte adresse som plassholder: appen skal ikke røpe hvor noens
                 // hjemmeserver står, verken i koden (repoet er offentlig) eller på skjermen.
-                felt("Server", tekst: $vert, plassholder: "vertsnavn.eksempel.no",
+                felt("Server", tekst: $vert, plassholder: "vertsnavn",
                      hjelp: "Adressen til hjemmeserveren. Ingen «https://» foran.")
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)

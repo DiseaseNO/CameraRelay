@@ -9,7 +9,17 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Kjører FØRST og stopper alt hvis noe som avslører nettverket har sneket seg inn.
+  # Repoet er offentlig, og kodekommentarer skrives fortløpende — dette er en maskinsjekk
+  # i stedet for en huskeregel.
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/hygienesjekk.sh
+
   build:
+    needs: hygiene
     # Laster IKKE opp ved hver push. Vi bygger mange ganger i timen under designarbeid,
     # og Apple struper opplastinger per app. Simulator-jobben under kjører fortsatt alltid,
     # så skjermbilder og kompilering sjekkes uansett — bare TestFlight venter til vi ber om det.
@@ -69,6 +79,7 @@ jobs:
   # vi blindt: koden kan kompilere feilfritt og likevel krasje ved oppstart eller se helt
   # gal ut. Skjermbildene hentes ned og inspiseres (scripts/gh_skjerm.py i smarthus-repoet).
   simulator:
+    needs: hygiene
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -108,17 +119,6 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_STYLE=Manual \
             | tail -30
-
-      # Runneren står utenfor hjemmenettet — samme utsiktspunkt som en telefon på
-      # mobilnett. Tester fra innsiden går ut og inn igjen (hairpin) og beviser ingenting.
-      - name: Nås backend utenfra?
-        env:
-          TEST_SERVER: ${{ secrets.TEST_SERVER }}
-        run: |
-          echo "utgående IP: $(curl -s --max-time 10 https://api.ipify.org || echo ukjent)"
-          curl -s -o /dev/null --max-time 20 \
-            -w 'health: oppkobling=%{time_connect}s tls=%{time_appconnect}s status=%{http_code}\n' \
-            "https://$TEST_SERVER/api/health" || echo "NÅDDE IKKE FRAM (geoblokk?)"
 
       - name: Start simulator og kjør appen
         env:

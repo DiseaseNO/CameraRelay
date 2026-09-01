@@ -238,7 +238,7 @@ struct Fullskjerm: View {
         .onDisappear { spiller.pause() }
     }
 
-    /// Ekte 4K i sanntid, ikke et opptak. Backend spinner opp en RTSP-remux ved behov og
+    /// Ekte 4K i sanntid, ikke et opptak. Backend pakker om strømmen ved behov og
     /// river den når ingen henter segmenter — derfor er den bare tilgjengelig herfra, i
     /// fullskjerm, og ikke som en knapp i lista.
     private func klem(_ s: CGSize, _ z: CGFloat, _ r: CGSize) -> CGSize {
