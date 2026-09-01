@@ -39,7 +39,7 @@ struct KameraOpptak: View {
     @State private var feil: String?
     @State private var laster = true
     /// Låste klipp for dette kameraet. Hentes med ETT kall når visningen åpnes — ikke per
-    /// rad. Å slå opp låsestatus for ett klipp får recorderen til å generere klippet, så
+    /// rad. Å slå opp låsestatus for ett klipp får opptaksenheten til å generere klippet, så
     /// et oppslag per rad man blar forbi ville lagt den ned.
     @State private var låste: [LåstKlipp] = []
     /// Nedlasting og låsing bor i menyen øverst til høyre, ikke som knapper i kolonnen.
@@ -54,7 +54,7 @@ struct KameraOpptak: View {
 
     private var kamera: KameraTL? { kameraer.first { $0.navn == kameranavn } }
 
-    /// Recorderen justerer grensene på et deteksjonsklipp mens bevegelsen pågår, så det
+    /// Opptaksenheten justerer grensene på et deteksjonsklipp mens bevegelsen pågår, så det
     /// låste klippet kan ha litt andre tider enn dem vi har lagret. Vi sammenligner derfor
     /// med OVERLAPP, ikke med likhet.
     private func erLåst(_ k: Klipp) -> Bool {
@@ -678,7 +678,7 @@ struct Klipp: Identifiable {
     }
 }
 
-/// Recorderens film-stripe: fire rammer i én JPEG. Vises HEL — beskjærer man den til
+/// Opptaksenhetens film-stripe: fire rammer i én JPEG. Vises HEL — beskjærer man den til
 /// 16:9 ser man bare en flis av hendelsen, og da er den verdiløs.
 struct Stripe: View {
     let api: API

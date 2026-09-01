@@ -2,7 +2,7 @@ import SwiftUI
 import AVKit
 
 /// AVPlayer-lag med digital pinch-zoom, som i web-spilleren. Bildet er 4K, så det er
-/// ekte detalj å hente ut — vi forstørrer det vi allerede har, uten å be recorderen om noe.
+/// ekte detalj å hente ut — vi forstørrer det vi allerede har, uten å be opptaksenheten om noe.
 struct Spiller: View {
     let url: URL
     /// Selve bevegelsen, i sekunder fra klippets start. Vises som gult felt i baren.
@@ -20,7 +20,7 @@ struct Spiller: View {
     @State private var skyvVedStart: CGSize = .zero
     @State private var observatør: Any?
     /// Videoens EKTE sideforhold. Vi tvang 16:9 før, og da fikk alt som ikke er nøyaktig
-    /// 16:9 svarte kanter. Recorderens klipp varierer, så vi måler i stedet for å anta.
+    /// 16:9 svarte kanter. Opptaksenhetens klipp varierer, så vi måler i stedet for å anta.
     @State private var sideforhold: CGFloat = 16.0 / 9.0
 
     private let maksZoom: CGFloat = 6

@@ -5,9 +5,9 @@ import SwiftUI
 /// Samme knapperad brukes på Opptak-fanen og på Låste-fanen — et låst klipp skal se og
 /// oppføre seg likt uansett hvor man finner det.
 ///
-/// Låsestatusen kommer INN som en verdi. Vi spør bevisst ikke recorderen per klipp: å slå
+/// Låsestatusen kommer INN som en verdi. Vi spør bevisst ikke opptaksenheten per klipp: å slå
 /// opp ett opptak får den til å generere klippet, og hadde vi gjort det for hver rad man
-/// blar forbi, ville lista alene lagt recorderen ned. Statusen hentes i stedet med ett
+/// blar forbi, ville lista alene lagt opptaksenheten ned. Statusen hentes i stedet med ett
 /// kall (`/api/kamera/laste`) og sammenlignes lokalt.
 struct Klippknapper: View {
     let api: API
@@ -15,7 +15,7 @@ struct Klippknapper: View {
     let klipp: Intervall
     var sub: Int = 2
     let låst: Bool
-    /// Kalles når låsen faktisk er endret hos recorderen, med den nye tilstanden.
+    /// Kalles når låsen faktisk er endret hos opptaksenheten, med den nye tilstanden.
     let påLåsEndret: (Bool) -> Void
 
     @State private var nedlaster = Nedlaster()

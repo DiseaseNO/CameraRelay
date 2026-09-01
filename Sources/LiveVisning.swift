@@ -1,7 +1,7 @@
 import SwiftUI
 import AVKit
 
-/// Kameraene live. Backend pakker recorderens fMP4-strøm som HLS, så AVPlayer får
+/// Kameraene live. Backend pakker opptaksenhetens fMP4-strøm som HLS, så AVPlayer får
 /// maskinvare-dekoding, låseskjerm-kontroller og AirPlay gratis.
 struct LiveVisning: View {
     let api: API
@@ -121,7 +121,7 @@ struct LiveKort: View {
         stopp = false
     }
 
-    /// Vaktbikkje. AVPlayer stopper STILLE når strømmen ryker — recorderen bytter temp-fil
+    /// Vaktbikkje. AVPlayer stopper STILLE når strømmen ryker — opptaksenheten bytter temp-fil
     /// ved ny sesjon, og da fryser bildet eller blir svart uten at det kommer en feil.
     /// Står avspillingen i ro i 12 s, bygger vi strømmen opp igjen.
     private func startVakt() {

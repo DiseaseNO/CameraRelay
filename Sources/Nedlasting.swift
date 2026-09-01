@@ -4,7 +4,7 @@ import Observation
 
 /// Laster et klipp ned og legger det i KAMERARULLEN.
 ///
-/// To ting må stemme for at Fotos skal godta fila, og begge var feil i recorderens
+/// To ting må stemme for at Fotos skal godta fila, og begge var feil i opptaksenhetens
 /// original: den er en fragmentert MP4 tagget `hev1`. Backend pakker den derfor om til en
 /// vanlig progressiv MP4 med `hvc1` (`-c copy`, ingen reenkoding). Her gjenstår bare å
 /// hente den og be om skrive-tilgang.

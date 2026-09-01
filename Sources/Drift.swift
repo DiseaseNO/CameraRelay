@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// Driftsstatus: kjører tjenestene på serveren, og hvordan står det til med recorderen?
+/// Driftsstatus: kjører tjenestene på serveren, og hvordan står det til med opptaksenheten?
 ///
 /// Hensikten er å kunne svare på «virker det?» fra sofaen. Feilsøkingssida svarer på om
 /// VEIEN fram er åpen; denne svarer på om det som skal kjøre i andre enden faktisk gjør
-/// det, og om recorderen har plass igjen.
+/// det, og om opptaksenheten har plass igjen.
 ///
 /// Recordertallene er bevisst ikke sanntid. Backend cacher dem i et minutt, og visningen
-/// henter på nytt hvert minutt mens fanen er framme — hvert oppslag koster recorderen noe,
+/// henter på nytt hvert minutt mens fanen er framme — hvert oppslag koster opptaksenheten noe,
 /// og det er ingenting her som endrer seg fra sekund til sekund.
 struct Drift: View {
     let api: API
@@ -97,7 +97,7 @@ struct Drift: View {
         }
     }
 
-    /// Recorderens EGET anslag. Vi regnet oss tidligere fram til noe helt annet ved å
+    /// Opptaksenhetens EGET anslag. Vi regnet oss tidligere fram til noe helt annet ved å
     /// dele brukt plass på oppetid — den holder ikke, for opptaksmengden varierer med
     /// hvor mye som skjer foran kameraene.
     private func plassIgjen(_ r: RecorderStatus) -> String {
@@ -135,7 +135,7 @@ struct Drift: View {
         mb >= 1024 ? String(format: "%.0f GB", mb / 1024) : String(format: "%.0f MB", mb)
     }
 
-    /// «1 23 48 28» fra recorderen = dager timer minutter sekunder.
+    /// «1 23 48 28» fra opptaksenheten = dager timer minutter sekunder.
     private func recorderOppetid(_ rå: String) -> String {
         let d = rå.split(separator: " ").compactMap { Double($0) }
         guard d.count >= 3 else { return rå }

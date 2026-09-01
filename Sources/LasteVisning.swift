@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// Fanen «Låste»: alle opptak som er beskyttet mot recorderens opprydding.
+/// Fanen «Låste»: alle opptak som er beskyttet mot opptaksenhetens opprydding.
 ///
 /// Hvorfor den finnes: opptak slettes IKKE etter en tidsfrist hos oss, de slettes når
 /// videodisken går full. Et låst klipp overlever den oppryddingen. Da må man også kunne
 /// se hva som faktisk er låst — ellers vet man ikke hva som er trygt før det er borte.
 ///
-/// Lista kommer fra recorderen selv (`evt_filter=12`), ikke fra vårt lokale arkiv. Den
+/// Lista kommer fra opptaksenheten selv (`evt_filter=12`), ikke fra vårt lokale arkiv. Den
 /// viser derfor sannheten også for klipp som er eldre enn de sju døgnene arkivet holder.
 struct LåsteVisning: View {
     let api: API

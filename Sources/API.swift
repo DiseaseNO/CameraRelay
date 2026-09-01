@@ -57,15 +57,15 @@ private struct LåsteSvar: Decodable { let klipp: [LåstKlipp] }
 
 // MARK: driftsstatus
 
-/// En systemd-tjeneste på serveren (CT 115).
+/// En tjeneste på hjemmeserveren.
 struct TjenesteStatus: Decodable, Identifiable, Hashable {
     let navn: String, unit: String, hva: String
     let aktiv: Bool, tilstand: String
     let oppeSek: Double, minneMB: Int
     var id: String { unit }
 }
-/// Recorderens ressursbruk. Ikke sanntid — backend cacher i et minutt, for hvert
-/// oppslag koster recorderen noe.
+/// Opptaksenhetens ressursbruk. Ikke sanntid — backend cacher i et minutt, for hvert
+/// oppslag koster noe.
 struct RecorderStatus: Decodable, Hashable {
     struct Disk: Decodable, Hashable { let brukt: Double; let total: Double; let prosent: Double }
     struct Logg: Decodable, Hashable { let prosent: Double }
@@ -105,7 +105,7 @@ enum APIFeil: LocalizedError {
     }
 }
 
-/// Klienten mot smarthus-backend. Appen kjenner ingen adresser på forhånd — verten
+/// Klienten mot hjemmeserveren. Appen kjenner ingen adresser på forhånd — verten
 /// skrives inn ved paring og lagres i Keychain sammen med enhets-tokenet.
 @Observable
 final class API {
@@ -160,12 +160,10 @@ final class API {
         try await hent(TidslinjeSvar.self, "/api/kamera/tidslinje").kameraer
     }
 
-    /// Driftsstatus: tjenestene på serveren + recorderens ressursbruk.
+    /// Driftsstatus: tjenestene på serveren + opptaksenhetens ressursbruk.
     ///
-    /// Stien ligger under `/api/kamera/` med vilje. Utenfra går appen gjennom
-    /// `frcr.gustavs1.no`, der FortiADC bare slipper gjennom `^/api/kamera/`,
-    /// `/api/enheter/par` og `/api/health` — alt annet dropper med **503**. Det var
-    /// nettopp det som skjedde da endepunktet het `/api/system/status`.
+    /// Stien ligger under `/api/kamera/` med vilje — se den interne dokumentasjonen for
+    /// hvorfor. Nye stier appen bruker må ligge samme sted.
     func drift() async throws -> DriftSvar {
         try await hent(DriftSvar.self, "/api/kamera/drift")
     }

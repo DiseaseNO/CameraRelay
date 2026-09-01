@@ -20,7 +20,7 @@ struct Innstillinger: View {
                 Section {
                     Rad("Server", api.vert ?? "—")
                     NavigationLink { DriftSide(api: api) } label: {
-                        merke("Drift", "waveform.path.ecg", "tjenester og recorderens ressurser")
+                        merke("Drift", "waveform.path.ecg", "tjenester og opptaksenhetens ressurser")
                     }
                     NavigationLink { FeilsøkingSide(api: api) } label: {
                         merke("Feilsøking", "stethoscope", "test forbindelsen ledd for ledd")
@@ -140,9 +140,8 @@ private struct StatistikkSide: View {
 }
 
 /// Går gjennom leddene i rekkefølge, så man ser HVOR det stopper — ikke bare at «noe»
-/// er galt. Appen snakker med et hjemmelaget oppsett gjennom flere ledd (brannmur, ADC,
-/// Caddy, relay, recorder), og det er stor forskjell på «serveren svarer ikke» og
-/// «serveren svarer, men kameraet er nede».
+/// er galt. Det er stor forskjell på «serveren svarer ikke» og «serveren svarer, men
+/// kameraet er nede».
 private struct FeilsøkingSide: View {
     let api: API
     @State private var sjekker = false
